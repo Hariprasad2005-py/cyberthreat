@@ -104,7 +104,7 @@ def load_dataset_for_sim():
 def auto_simulate():
     """Reads from clean_dataset.csv and sends traffic to /predict every 2s."""
     print("[SIMULATOR] Starting in 15 seconds...")
-    time.sleep(15)  # wait for Flask to fully start
+    time.sleep(2)  # wait for Flask to fully start
 
     class_groups, feature_cols, classes = load_dataset_for_sim()
     if class_groups is None:
