@@ -12,7 +12,7 @@ import plotly.express as px
 from datetime import datetime
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
-API_BASE      = "http://127.0.0.1:5000"
+API_BASE      = "https://cyberthreat-api.onrender.com"
 REFRESH_SECS  = 5
 HISTORY_LIMIT = 100
 
