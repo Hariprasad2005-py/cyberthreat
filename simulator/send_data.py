@@ -22,8 +22,7 @@ import pandas as pd
 import os
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
-API_URL      = "http://127.0.0.1:5000/predict"
-DATASET_PATH = "archive/dataset.csv"
+API_BASE = "https://cyberthreat-api.onrender.com"DATASET_PATH = "archive/dataset.csv"
 
 IP_POOLS = {
     "Other"  : [f"10.0.0.{i}"     for i in range(1, 50)],
