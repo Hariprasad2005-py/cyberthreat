@@ -34,7 +34,27 @@ app = Flask(__name__)
 CORS(app)
 
 prediction_history = []
-blocked_ips = []
+
+import json
+BLOCKED_IPS_FILE = os.path.join(BASE_DIR, "blocked_ips.json")
+
+def load_blocked_ips():
+    if os.path.exists(BLOCKED_IPS_FILE):
+        try:
+            with open(BLOCKED_IPS_FILE, "r") as f:
+                return json.load(f)
+        except:
+            pass
+    return []
+
+def save_blocked_ips(ips):
+    try:
+        with open(BLOCKED_IPS_FILE, "w") as f:
+            json.dump(ips, f)
+    except Exception as e:
+        print(f"[WARN] Could not save blocked IPs: {e}")
+
+blocked_ips = load_blocked_ips()
 
 # ─── LOAD MODEL ───────────────────────────────────────────────────────────────
 def load_artifacts():
@@ -274,7 +294,8 @@ def block_ip():
     ip = data.get("ip")
     if ip and ip not in blocked_ips:
         blocked_ips.append(ip)
-    return jsonify({"status": "blocked", "ip": ip}), 200
+        save_blocked_ips(blocked_ips)
+    return jsonify({"status": "blocked", "ip": ip, "total_blocked": len(blocked_ips)}), 200
 
 @app.route("/unblock_ip", methods=["POST"])
 def unblock_ip():
@@ -282,7 +303,8 @@ def unblock_ip():
     ip = data.get("ip")
     if ip in blocked_ips:
         blocked_ips.remove(ip)
-    return jsonify({"status": "unblocked", "ip": ip}), 200
+        save_blocked_ips(blocked_ips)
+    return jsonify({"status": "unblocked", "ip": ip, "total_blocked": len(blocked_ips)}), 200
 
 # ─── MAIN ─────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
