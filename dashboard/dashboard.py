@@ -19,12 +19,16 @@ REFRESH_SECS  = 5
 HISTORY_LIMIT = 100
 
 ATTACK_COLORS = {
+    "Normal Traffic": "#22c55e",
     "Other"         : "#6366f1",
     "DDoS"          : "#ef4444",
     "Botnet"        : "#f59e0b",
     "Port Scan"     : "#f97316",
     "Brute Force"   : "#8b5cf6",
-    "Normal Traffic": "#22c55e",
+    "Web Attack"    : "#06b6d4",
+    "DoS"           : "#ec4899",
+    "Infiltration"  : "#dc2626",
+    "Heartbleed"    : "#7c3aed",
 }
 
 # IP prefix → approximate geo coordinates for threat map
@@ -347,13 +351,114 @@ with col_gauge_info:
         recent_ts    = recent.get("timestamp","")[:19].replace("T"," ")
         anomaly_rate = round(anomaly / total * 100) if total else 0
         summary_color = gauge_color
+
+        # ── Threat Prediction Algorithm ──────────────────────────────────────
+        # Uses last 10 events to find trending attack, weighted so recent
+        # events matter more than older ones (weight = position index)
+        last10 = [h.get("attack_type","Other") for h in history[-10:]]
+        weighted_counts = {}
+        for i, atk in enumerate(last10):
+            weight = i + 1          # more recent = higher index = higher weight
+            weighted_counts[atk] = weighted_counts.get(atk, 0) + weight
+
+        # Remove "Other" / "Normal Traffic" from prediction — not useful
+        for exclude in ["Other", "Normal Traffic"]:
+            weighted_counts.pop(exclude, None)
+
+        if weighted_counts:
+            predicted_next = max(weighted_counts, key=weighted_counts.get)
+            pred_score     = weighted_counts[predicted_next]
+            pred_total     = sum(weighted_counts.values())
+            pred_confidence = round(pred_score / pred_total * 100)
+            pred_basis     = f"{len(last10)} recent events, trend-weighted"
+        else:
+            # All recent traffic is normal — predict it stays normal
+            predicted_next  = "Normal Traffic"
+            pred_confidence = 90
+            pred_basis      = "no attacks in recent traffic"
+
+        pred_color = ATTACK_COLORS.get(predicted_next, "#334155")
+        conf_color = "#22c55e" if pred_confidence >= 60 else "#f59e0b"
+        # ─────────────────────────────────────────────────────────────────────
+
         st.markdown(f"""
+        <style>
+        @keyframes fadeSlideIn {{
+            from {{ opacity:0; transform:translateY(8px); }}
+            to   {{ opacity:1; transform:translateY(0); }}
+        }}
+        @keyframes scanline {{
+            0%   {{ left:-100%; }}
+            100% {{ left:200%; }}
+        }}
+        @keyframes blink {{
+            0%,100% {{ opacity:1; }} 50% {{ opacity:0.3; }}
+        }}
+        .pred-card {{
+            animation: fadeSlideIn 0.6s ease forwards;
+            position:relative; overflow:hidden;
+            background: linear-gradient(135deg, {pred_color}18 0%, {pred_color}08 100%);
+            border: 1.5px solid {pred_color}55;
+            border-radius: 12px;
+            padding: 0.85rem 1.1rem;
+            margin-top: 0.6rem;
+        }}
+        .pred-card::after {{
+            content:'';
+            position:absolute; top:0; width:40%; height:100%;
+            background: linear-gradient(90deg, transparent, {pred_color}22, transparent);
+            animation: scanline 2.5s ease-in-out infinite;
+        }}
+        .pred-label {{
+            font-size:0.68rem; font-weight:700; letter-spacing:0.1em;
+            text-transform:uppercase; color:{pred_color}; margin-bottom:0.3rem;
+            display:flex; align-items:center; gap:0.4rem;
+        }}
+        .pred-dot {{
+            width:7px; height:7px; border-radius:50%;
+            background:{pred_color};
+            display:inline-block;
+            animation: blink 1.2s infinite;
+        }}
+        .pred-name {{
+            font-size:1.35rem; font-weight:800;
+            color:{pred_color}; letter-spacing:-0.02em;
+            line-height:1.1;
+        }}
+        .conf-bar-bg {{
+            background:#e2e8f0; border-radius:99px;
+            height:5px; width:100%; margin-top:0.5rem; overflow:hidden;
+        }}
+        .conf-bar-fill {{
+            height:100%; border-radius:99px;
+            background: linear-gradient(90deg, {pred_color}88, {pred_color});
+            width:{pred_confidence}%;
+            transition: width 1s ease;
+        }}
+        </style>
         <div style="background:#f8fafc;border-radius:12px;padding:1rem 1.2rem;border:1px solid #e2e8f0;font-size:0.83rem;color:#334155;line-height:1.9">
             <div>🔴 <b>Dominant Threat:</b> <span style="color:{ATTACK_COLORS.get(top_attack,'#334155')};font-weight:700">{top_attack}</span> — {top_count} events detected</div>
             <div>⚡ <b>Current Threat Level:</b> <span style="color:{summary_color};font-weight:700">{gauge_label}</span> (Risk Score: {avg_risk:.2f})</div>
             <div>🌐 <b>Latest Source IP:</b> <span style="font-family:'JetBrains Mono',monospace">{recent_ip}</span> — Risk {recent_risk:.2f} at {recent_ts[11:]}</div>
             <div>🤖 <b>Anomaly Rate:</b> {anomaly_rate}% of traffic flagged by Isolation Forest</div>
             <div>📡 <b>Attack Rate:</b> {attacks_per_min} events/min — model confidence at {live_conf_pct}%</div>
+        </div>
+        <div class="pred-card">
+            <div class="pred-label">
+                <span class="pred-dot"></span>
+                🔮 AI Threat Prediction — Next Likely Attack
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:flex-end">
+                <div class="pred-name">{predicted_next}</div>
+                <div style="text-align:right">
+                    <div style="font-size:1.1rem;font-weight:800;color:{conf_color}">{pred_confidence}%</div>
+                    <div style="font-size:0.68rem;color:#94a3b8;font-weight:600">CONFIDENCE</div>
+                </div>
+            </div>
+            <div class="conf-bar-bg"><div class="conf-bar-fill"></div></div>
+            <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.4rem">
+                Based on {pred_basis}
+            </div>
         </div>
         """, unsafe_allow_html=True)
     else:
@@ -680,9 +785,10 @@ with col_export:
             summary_lines.append(f"  {att:<18}: {cnt}")
         summary_txt = "\n".join(summary_lines).encode("utf-8")
         st.download_button(
-label="⬇️ Download Report (PDF)",            data=summary_txt,
-file_name=f"threat_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-mime="application/pdf",
+            label="⬇️ Download Report (TXT)",
+            data=summary_txt,
+            file_name=f"threat_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+            mime="text/plain",
             use_container_width=True,
         )
         st.markdown(f"""
