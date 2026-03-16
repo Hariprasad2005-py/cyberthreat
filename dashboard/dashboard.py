@@ -194,17 +194,7 @@ def fetch_stats():
 def fetch_model():
     return fetch("model_info") or {}
 
-def fetch_blocked():
-    d = fetch("blocked_ips")
-    return d if isinstance(d, list) else []
 
-def block_ip(ip):
-    post_api("block_ip", {"ip": ip})
-    st.session_state.alert_log.append({"time": datetime.now().strftime("%H:%M:%S"), "action": f"🚫 Blocked {ip}"})
-
-def unblock_ip(ip):
-    post_api("unblock_ip", {"ip": ip})
-    st.session_state.alert_log.append({"time": datetime.now().strftime("%H:%M:%S"), "action": f"✅ Unblocked {ip}"})
 
 # ─── SIDEBAR ──────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -221,12 +211,18 @@ with st.sidebar:
             st.markdown('<p class="status-offline">● API Error</p>', unsafe_allow_html=True)
     except:
         st.markdown('<p class="status-offline">● API Offline — waking up…</p>', unsafe_allow_html=True)
-
+    st.markdown("---")
+    st.markdown("**📋 Action Log**")
+    if st.session_state.alert_log:
+        for log in reversed(st.session_state.alert_log[-5:]):
+            st.caption(f"{log['time']}  {log['action']}")
+    else:
+        st.caption("No actions yet")
 
 # ─── FETCH ────────────────────────────────────────────────────────────────────
-history     = fetch_history()
-stats       = fetch_stats()
-model       = fetch_model()
+history  = fetch_history()
+stats    = fetch_stats()
+model    = fetch_model()
 
 # ─── SOUND ────────────────────────────────────────────────────────────────────
 if history and st.session_state.sound_enabled:
@@ -272,7 +268,6 @@ with k3:
     st.markdown(f'<div class="kpi-card {risk_color}"><div class="kpi-label">Avg Risk Score</div><div class="kpi-value {risk_color}">{avg_risk:.2f}</div><div class="kpi-sub">0 = safe · 1 = critical</div></div>', unsafe_allow_html=True)
 with k4:
     st.markdown(f'<div class="kpi-card amber"><div class="kpi-label">Anomalies</div><div class="kpi-value amber">{anomaly:,}</div><div class="kpi-sub">Isolation Forest</div></div>', unsafe_allow_html=True)
-
 
 st.markdown("<div style='margin-bottom:1rem'></div>", unsafe_allow_html=True)
 
@@ -411,7 +406,6 @@ with col_alerts:
     st.markdown('<div class="chart-card">', unsafe_allow_html=True)
     st.markdown('<p class="section-header"><span class="dot" style="background:#ef4444"></span>Live Threat Alerts</p>', unsafe_allow_html=True)
     if history:
-        blocked_ips = fetch_blocked()   # ← ADD THIS LINE
         for idx, pred in enumerate(reversed(history[-8:])):
             attack = pred.get("attack_type", "?")
             ip     = pred.get("source_ip", "?")
@@ -432,9 +426,6 @@ with col_alerts:
                     <span style="font-size:0.73rem;font-weight:700">{risk:.2f}</span>
                 </div>
             </div>""", unsafe_allow_html=True)
-            if attack != "Other" and ip not in blocked_ips:
-                if st.button(f"🚫 Block {ip}", key=f"blk_{ip}_{idx}"):
-                    block_ip(ip); time.sleep(0.3); st.rerun()
     else:
         st.info("No alerts yet.")
     st.markdown('</div>', unsafe_allow_html=True)
@@ -447,7 +438,8 @@ col_model, col_ips, col_bar = st.columns([1.2, 1.4, 1.4])
 with col_model:
     st.markdown('<div class="chart-card">', unsafe_allow_html=True)
     st.markdown('<p class="section-header"><span class="dot" style="background:#8b5cf6"></span>Model Performance</p>', unsafe_allow_html=True)
-    acc   = model.get("accuracy", 0.97)
+    acc   = model.get("accuracy") or 0.97
+    acc   = float(acc)
     trees = model.get("n_estimators", 100)
     feats = model.get("n_features", 26)
     iso   = "✅ Active" if model.get("iso_forest_fitted", False) else "⏳ Training"
@@ -491,8 +483,7 @@ with col_ips:
                        .sort_values("attacks", ascending=False)
                        .head(8))
             for _, row in top_ips.iterrows():
-                color      = ATTACK_COLORS.get(row["top_attack"], "#94a3b8")
-                is_blocked = row["source_ip"] in blocked_ips
+                color = ATTACK_COLORS.get(row["top_attack"], "#94a3b8")
                 st.markdown(f"""
                 <div class="ip-row">
                     <div>
@@ -502,7 +493,6 @@ with col_ips:
                     <div style="display:flex;align-items:center;gap:0.4rem">
                         <span style="font-size:0.7rem;color:#94a3b8">{row['avg_risk']:.2f}</span>
                         <span class="count-badge">{row['attacks']}</span>
-                        {"<span style='font-size:0.7rem'>🚫</span>" if is_blocked else ""}
                     </div>
                 </div>""", unsafe_allow_html=True)
         else:
@@ -538,4 +528,4 @@ with col_bar:
 # ─── AUTO REFRESH ─────────────────────────────────────────────────────────────
 if auto_refresh:
     time.sleep(REFRESH_SECS)
-    st.rerun()
+    st.rerun()  
