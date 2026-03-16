@@ -221,31 +221,12 @@ with st.sidebar:
             st.markdown('<p class="status-offline">● API Error</p>', unsafe_allow_html=True)
     except:
         st.markdown('<p class="status-offline">● API Offline — waking up…</p>', unsafe_allow_html=True)
-    st.markdown("---")
-    st.markdown("**🚫 Blocked IPs**")
-    blocked_sidebar = fetch_blocked()
-    if blocked_sidebar:
-        for ip in blocked_sidebar:
-            c1, c2 = st.columns([3,1])
-            with c1: st.code(ip, language=None)
-            with c2:
-                if st.button("✕", key=f"ub_{ip}"):
-                    unblock_ip(ip); st.rerun()
-    else:
-        st.caption("No blocked IPs")
-    st.markdown("---")
-    st.markdown("**📋 Action Log**")
-    if st.session_state.alert_log:
-        for log in reversed(st.session_state.alert_log[-5:]):
-            st.caption(f"{log['time']}  {log['action']}")
-    else:
-        st.caption("No actions yet")
+
 
 # ─── FETCH ────────────────────────────────────────────────────────────────────
 history     = fetch_history()
 stats       = fetch_stats()
 model       = fetch_model()
-blocked_ips = fetch_blocked()
 
 # ─── SOUND ────────────────────────────────────────────────────────────────────
 if history and st.session_state.sound_enabled:
@@ -282,7 +263,7 @@ anomaly  = stats.get("anomaly_count", 0)
 high_pct = round(high / total * 100) if total else 0
 risk_color = "red" if avg_risk > 0.7 else "amber" if avg_risk > 0.4 else "green"
 
-k1,k2,k3,k4,k5 = st.columns(5)
+k1,k2,k3,k4 = st.columns(4)
 with k1:
     st.markdown(f'<div class="kpi-card blue"><div class="kpi-label">Total Requests</div><div class="kpi-value blue">{total:,}</div><div class="kpi-sub">Events analyzed</div></div>', unsafe_allow_html=True)
 with k2:
@@ -291,8 +272,7 @@ with k3:
     st.markdown(f'<div class="kpi-card {risk_color}"><div class="kpi-label">Avg Risk Score</div><div class="kpi-value {risk_color}">{avg_risk:.2f}</div><div class="kpi-sub">0 = safe · 1 = critical</div></div>', unsafe_allow_html=True)
 with k4:
     st.markdown(f'<div class="kpi-card amber"><div class="kpi-label">Anomalies</div><div class="kpi-value amber">{anomaly:,}</div><div class="kpi-sub">Isolation Forest</div></div>', unsafe_allow_html=True)
-with k5:
-    st.markdown(f'<div class="kpi-card purple"><div class="kpi-label">Blocked IPs</div><div class="kpi-value purple">{len(blocked_ips)}</div><div class="kpi-sub">Active blocks</div></div>', unsafe_allow_html=True)
+
 
 st.markdown("<div style='margin-bottom:1rem'></div>", unsafe_allow_html=True)
 
