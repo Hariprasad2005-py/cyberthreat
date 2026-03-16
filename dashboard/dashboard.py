@@ -36,10 +36,11 @@ st.set_page_config(
 )
 
 # ─── SESSION STATE ────────────────────────────────────────────────────────────
-if "blocked_ips"       not in st.session_state: st.session_state.blocked_ips       = set()
-if "alerted_ids"       not in st.session_state: st.session_state.alerted_ids       = set()
-if "sound_enabled"     not in st.session_state: st.session_state.sound_enabled     = True
-if "alert_log"         not in st.session_state: st.session_state.alert_log         = []
+if "blocked_ips"   not in st.session_state: st.session_state.blocked_ips   = []
+if "alerted_ids"   not in st.session_state: st.session_state.alerted_ids   = []
+if "sound_enabled" not in st.session_state: st.session_state.sound_enabled = True
+if "alert_log"     not in st.session_state: st.session_state.alert_log     = []
+if "sound_armed"   not in st.session_state: st.session_state.sound_armed   = False
 
 # ─── CUSTOM CSS ───────────────────────────────────────────────────────────────
 st.markdown("""
@@ -83,27 +84,26 @@ st.markdown("""
 # ─── SOUND ALERT (JS) ─────────────────────────────────────────────────────────
 ALERT_SOUND_JS = """
 <script>
-function playAlert() {
-    try {
-        var ctx = new (window.AudioContext || window.webkitAudioContext)();
-        function beep(freq, start, duration) {
-            var o = ctx.createOscillator();
-            var g = ctx.createGain();
-            o.connect(g);
-            g.connect(ctx.destination);
-            o.frequency.value = freq;
-            o.type = 'square';
-            g.gain.setValueAtTime(0.3, ctx.currentTime + start);
-            g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + duration);
-            o.start(ctx.currentTime + start);
-            o.stop(ctx.currentTime + start + duration);
-        }
-        beep(880, 0,    0.15);
-        beep(660, 0.2,  0.15);
-        beep(880, 0.4,  0.15);
-    } catch(e) { console.log('Audio error:', e); }
-}
-playAlert();
+(function() {
+    function playAlert() {
+        try {
+            var ctx = new (window.AudioContext || window.webkitAudioContext)();
+            if (ctx.state === 'suspended') { ctx.resume(); }
+            function beep(freq, start, dur) {
+                var o = ctx.createOscillator();
+                var g = ctx.createGain();
+                o.connect(g); g.connect(ctx.destination);
+                o.frequency.value = freq; o.type = 'square';
+                g.gain.setValueAtTime(0.3, ctx.currentTime + start);
+                g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+                o.start(ctx.currentTime + start);
+                o.stop(ctx.currentTime + start + dur);
+            }
+            beep(880, 0, 0.15); beep(660, 0.2, 0.15); beep(880, 0.4, 0.15);
+        } catch(e) { console.log('Audio error:', e); }
+    }
+    playAlert();
+})();
 </script>
 """
 
@@ -140,7 +140,8 @@ def threat_level_badge(level):
     return {"HIGH": "🔴", "MEDIUM": "🟡", "LOW": "🟢"}.get(level, "⚪")
 
 def block_ip(ip):
-    st.session_state.blocked_ips.add(ip)
+    if ip not in st.session_state.blocked_ips:
+        st.session_state.blocked_ips.append(ip)
     st.session_state.alert_log.append({
         "time"   : datetime.now().strftime("%H:%M:%S"),
         "action" : f"🚫 Blocked IP: {ip}",
@@ -162,8 +163,20 @@ with st.sidebar:
     auto_refresh = st.checkbox("Auto Refresh (5s)", value=True)
     st.session_state.sound_enabled = st.checkbox("🔊 Sound Alerts", value=st.session_state.sound_enabled)
 
-    if st.button("🔄 Manual Refresh"):
-        st.rerun()
+    if st.session_state.sound_enabled:
+        if st.button("🔔 Arm Sound (click once)"):
+            st.session_state.sound_armed = True
+            st.markdown("""<script>
+            var ctx = new (window.AudioContext || window.webkitAudioContext)();
+            var b = ctx.createBuffer(1,1,22050);
+            var s = ctx.createBufferSource();
+            s.buffer=b; s.connect(ctx.destination); s.start(0);
+            window._audioArmed=true;
+            </script>""", unsafe_allow_html=True)
+        if st.session_state.sound_armed:
+            st.success("🔊 Sound Armed!")
+        else:
+            st.warning("⚠️ Click Arm Sound first")
 
     st.markdown("---")
     st.markdown("**Legend**")
@@ -185,7 +198,7 @@ with st.sidebar:
                 st.markdown(f'<span style="color:#ef4444;font-size:0.85em;">{ip}</span>', unsafe_allow_html=True)
             with col_btn:
                 if st.button("✕", key=f"unblock_{ip}"):
-                    st.session_state.blocked_ips.discard(ip)
+                    st.session_state.blocked_ips.remove(ip)
                     st.rerun()
 
 # ─── HEADER ───────────────────────────────────────────────────────────────────
@@ -199,7 +212,7 @@ stats      = fetch_stats()
 model_info = fetch_model_info()
 
 # ─── SOUND ALERT FOR NEW HIGH RISK ────────────────────────────────────────────
-if history and st.session_state.sound_enabled:
+if history and st.session_state.sound_enabled and st.session_state.sound_armed:
     new_high = [
         p for p in history[-5:]
         if p.get("threat_level") == "HIGH"
@@ -208,7 +221,7 @@ if history and st.session_state.sound_enabled:
     if new_high:
         st.markdown(ALERT_SOUND_JS, unsafe_allow_html=True)
         for p in new_high:
-            st.session_state.alerted_ids.add(p.get("timestamp", ""))
+            st.session_state.alerted_ids.append(p.get("timestamp", ""))
             st.session_state.alert_log.append({
                 "time"   : datetime.now().strftime("%H:%M:%S"),
                 "action" : f"🔴 HIGH RISK: {p.get('attack_type')} from {p.get('source_ip')}",
