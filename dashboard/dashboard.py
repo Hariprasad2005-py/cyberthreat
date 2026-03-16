@@ -141,17 +141,17 @@ section[data-testid="stSidebar"] {
 .kpi-card.green::before  { background: linear-gradient(90deg,#22c55e,#4ade80); }
 .kpi-card.purple::before { background: linear-gradient(90deg,#8b5cf6,#a78bfa); }
 
-.kpi-label { font-size:0.72rem; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:#94a3b8; margin-bottom:0.4rem; }
-.kpi-value { font-size:2.2rem; font-weight:800; color:#0f172a; line-height:1.1; font-variant-numeric:tabular-nums; }
+.kpi-label { font-size:0.82rem; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:#94a3b8; margin-bottom:0.4rem; }
+.kpi-value { font-size:2.3rem; font-weight:800; color:#0f172a; line-height:1.1; font-variant-numeric:tabular-nums; }
 .kpi-value.red    { color:#ef4444; }
 .kpi-value.amber  { color:#f59e0b; }
 .kpi-value.green  { color:#22c55e; }
 .kpi-value.blue   { color:#6366f1; }
 .kpi-value.purple { color:#8b5cf6; }
-.kpi-sub { font-size:0.75rem; color:#94a3b8; margin-top:0.3rem; }
+.kpi-sub { font-size:0.85rem; color:#94a3b8; margin-top:0.3rem; }
 
 .section-header {
-    font-size:1rem; font-weight:700; color:#0f172a;
+    font-size:1.1rem; font-weight:700; color:#0f172a;
     letter-spacing:-0.01em; margin:0 0 1rem 0;
     display:flex; align-items:center; gap:0.5rem;
 }
@@ -171,33 +171,33 @@ section[data-testid="stSidebar"] {
 .alert-row {
     display:flex; align-items:center; justify-content:space-between;
     padding:0.6rem 0.9rem; border-radius:10px; margin-bottom:0.45rem;
-    font-size:0.8rem; font-weight:500;
+    font-size:0.9rem; font-weight:500;
 }
 .alert-high   { background:rgba(255,241,242,0.9); border-left:3px solid #ef4444; }
 .alert-medium { background:rgba(255,251,235,0.9); border-left:3px solid #f59e0b; }
 .alert-low    { background:rgba(240,253,244,0.9); border-left:3px solid #22c55e; }
-.alert-tag { font-size:0.68rem; font-weight:700; padding:2px 7px; border-radius:99px; letter-spacing:0.05em; }
+.alert-tag { font-size:0.78rem; font-weight:700; padding:2px 7px; border-radius:99px; letter-spacing:0.05em; }
 .tag-high   { background:#fee2e2; color:#ef4444; }
 .tag-medium { background:#fef3c7; color:#d97706; }
 .tag-low    { background:#dcfce7; color:#16a34a; }
 
 .ip-row {
     display:flex; justify-content:space-between; align-items:center;
-    padding:0.5rem 0; border-bottom:1px solid rgba(241,245,249,0.8); font-size:0.8rem;
+    padding:0.5rem 0; border-bottom:1px solid rgba(241,245,249,0.8); font-size:0.9rem;
 }
 .ip-badge {
-    font-family:'JetBrains Mono',monospace; font-size:0.76rem;
+    font-family:'JetBrains Mono',monospace; font-size:0.86rem;
     background:rgba(248,250,252,0.9); border:1px solid #e2e8f0;
     padding:2px 7px; border-radius:6px; color:#334155;
 }
-.count-badge { background:#ef4444; color:white; font-size:0.68rem; font-weight:700; padding:2px 7px; border-radius:99px; }
+.count-badge { background:#ef4444; color:white; font-size:0.78rem; font-weight:700; padding:2px 7px; border-radius:99px; }
 
 .model-stat { text-align:center; padding:0.9rem; background:rgba(248,250,252,0.9); border-radius:12px; border:1px solid #e2e8f0; }
-.model-stat-val { font-size:1.5rem; font-weight:800; color:#6366f1; }
-.model-stat-lbl { font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#94a3b8; margin-top:0.2rem; }
+.model-stat-val { font-size:1.6rem; font-weight:800; color:#6366f1; }
+.model-stat-lbl { font-size:0.8rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#94a3b8; margin-top:0.2rem; }
 
-.page-title    { font-size:1.75rem; font-weight:800; color:#0f172a; letter-spacing:-0.03em; margin-bottom:0; }
-.page-subtitle { font-size:0.83rem; color:#64748b; margin-top:0.2rem; }
+.page-title    { font-size:1.85rem; font-weight:800; color:#0f172a; letter-spacing:-0.03em; margin-bottom:0; }
+.page-subtitle { font-size:0.93rem; color:#64748b; margin-top:0.2rem; }
 
 @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(1.4)} }
 .pulse-dot { width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;animation:pulse 1.8s infinite;margin-right:5px; }
@@ -205,8 +205,8 @@ section[data-testid="stSidebar"] {
 section[data-testid="stSidebar"] { background: rgba(15,23,42,0.97) !important; backdrop-filter:blur(20px); }
 section[data-testid="stSidebar"] * { color:#e2e8f0 !important; }
 section[data-testid="stSidebar"] hr { border-color:#1e293b !important; }
-.status-online  { color:#22c55e !important; font-weight:600; font-size:0.82rem; }
-.status-offline { color:#ef4444 !important; font-weight:600; font-size:0.82rem; }
+.status-online  { color:#22c55e !important; font-weight:600; font-size:0.92rem; }
+.status-offline { color:#ef4444 !important; font-weight:600; font-size:0.92rem; }
 </style>
 
 """, unsafe_allow_html=True)
@@ -253,7 +253,7 @@ canvas { display:block; width:100% !important; height:100% !important; }
 }
 
 #title-text {
-    font-size: 2rem;
+    font-size: 2.1rem;
     font-weight: 900;
     color: white;
     letter-spacing: -0.02em;
@@ -265,7 +265,7 @@ canvas { display:block; width:100% !important; height:100% !important; }
 }
 
 #sub-text {
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     font-weight: 700;
     color: rgba(226,232,240,0.95);
     letter-spacing: 0.14em;
@@ -294,7 +294,7 @@ canvas { display:block; width:100% !important; height:100% !important; }
     position: absolute;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 1.1rem;
+    font-size: 1.2rem;
     font-weight: 800;
     color: #60a5fa;
 }
@@ -596,9 +596,9 @@ with col_title:
 with col_time:
     st.markdown(f"""
         <div style="text-align:right;padding-top:0.8rem">
-            <div style="font-size:0.72rem;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.06em">Last Updated</div>
-            <div style="font-size:0.95rem;font-weight:700;color:#334155;font-family:'JetBrains Mono',monospace">{datetime.now().strftime('%H:%M:%S')}</div>
-            <div style="font-size:0.76rem;color:#94a3b8">{datetime.now().strftime('%d %b %Y')}</div>
+            <div style="font-size:0.82rem;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.06em">Last Updated</div>
+            <div style="font-size:1.05rem;font-weight:700;color:#334155;font-family:'JetBrains Mono',monospace">{datetime.now().strftime('%H:%M:%S')}</div>
+            <div style="font-size:0.86rem;color:#94a3b8">{datetime.now().strftime('%d %b %Y')}</div>
         </div>""", unsafe_allow_html=True)
 
 st.markdown("<div style='margin-bottom:1.2rem'></div>", unsafe_allow_html=True)
@@ -758,7 +758,7 @@ with col_gauge_info:
             animation: scanline 2.5s ease-in-out infinite;
         }}
         .pred-label {{
-            font-size:0.68rem; font-weight:700; letter-spacing:0.1em;
+            font-size:0.78rem; font-weight:700; letter-spacing:0.1em;
             text-transform:uppercase; color:{pred_color}; margin-bottom:0.3rem;
             display:flex; align-items:center; gap:0.4rem;
         }}
@@ -769,7 +769,7 @@ with col_gauge_info:
             animation: blink 1.2s infinite;
         }}
         .pred-name {{
-            font-size:1.35rem; font-weight:800;
+            font-size:1.45rem; font-weight:800;
             color:{pred_color}; letter-spacing:-0.02em;
             line-height:1.1;
         }}
@@ -784,7 +784,7 @@ with col_gauge_info:
             transition: width 1s ease;
         }}
         </style>
-        <div style="background:#f8fafc;border-radius:12px;padding:1rem 1.2rem;border:1px solid #e2e8f0;font-size:0.83rem;color:#334155;line-height:1.9">
+        <div style="background:#f8fafc;border-radius:12px;padding:1rem 1.2rem;border:1px solid #e2e8f0;font-size:0.93rem;color:#334155;line-height:1.9">
             <div>🔴 <b>Dominant Threat:</b> <span style="color:{ATTACK_COLORS.get(top_attack,'#334155')};font-weight:700">{top_attack}</span> — {top_count} events detected</div>
             <div>⚡ <b>Current Threat Level:</b> <span style="color:{summary_color};font-weight:700">{gauge_label}</span> (Risk Score: {avg_risk:.2f})</div>
             <div>🌐 <b>Latest Source IP:</b> <span style="font-family:'JetBrains Mono',monospace">{recent_ip}</span> — Risk {recent_risk:.2f} at {recent_ts[11:]}</div>
@@ -799,12 +799,12 @@ with col_gauge_info:
             <div style="display:flex;justify-content:space-between;align-items:flex-end">
                 <div class="pred-name">{predicted_next}</div>
                 <div style="text-align:right">
-                    <div style="font-size:1.1rem;font-weight:800;color:{conf_color}">{pred_confidence}%</div>
-                    <div style="font-size:0.68rem;color:#94a3b8;font-weight:600">CONFIDENCE</div>
+                    <div style="font-size:1.2rem;font-weight:800;color:{conf_color}">{pred_confidence}%</div>
+                    <div style="font-size:0.78rem;color:#94a3b8;font-weight:600">CONFIDENCE</div>
                 </div>
             </div>
             <div class="conf-bar-bg"><div class="conf-bar-fill"></div></div>
-            <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.4rem">
+            <div style="font-size:0.8rem;color:#94a3b8;margin-top:0.4rem">
                 Based on {pred_basis}
             </div>
         </div>
@@ -888,7 +888,7 @@ with col_pie:
             color = ATTACK_COLORS.get(att, "#94a3b8")
             pct   = round(cnt / total_events * 100)
             st.markdown(f"""
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:0.28rem 0;border-bottom:1px solid #f1f5f9;font-size:0.79rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:0.28rem 0;border-bottom:1px solid #f1f5f9;font-size:0.89rem">
                 <div style="display:flex;align-items:center;gap:0.4rem">
                     <span style="width:9px;height:9px;border-radius:50%;background:{color};display:inline-block"></span>
                     <span style="color:#334155;font-weight:500">{att}</span>
@@ -958,11 +958,11 @@ with col_alerts:
             <div class="alert-row {css_cls}">
                 <div>
                     <div style="font-weight:700;color:{color}">{attack}</div>
-                    <div style="font-size:0.7rem;opacity:0.7;font-family:'JetBrains Mono',monospace">{ip} · {ts[11:]}</div>
+                    <div style="font-size:0.8rem;opacity:0.7;font-family:'JetBrains Mono',monospace">{ip} · {ts[11:]}</div>
                 </div>
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
                     <span class="alert-tag {tag_cls}">{level}</span>
-                    <span style="font-size:0.73rem;font-weight:700">{risk:.2f}</span>
+                    <span style="font-size:0.83rem;font-weight:700">{risk:.2f}</span>
                 </div>
             </div>""", unsafe_allow_html=True)
     else:
@@ -988,16 +988,16 @@ with col_model:
         <div class="model-stat-lbl">Accuracy</div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.6rem">
-        <div class="model-stat"><div class="model-stat-val" style="font-size:1.3rem">{trees}</div><div class="model-stat-lbl">Trees</div></div>
-        <div class="model-stat"><div class="model-stat-val" style="font-size:1.3rem">{feats}</div><div class="model-stat-lbl">Features</div></div>
+        <div class="model-stat"><div class="model-stat-val" style="font-size:1.4rem">{trees}</div><div class="model-stat-lbl">Trees</div></div>
+        <div class="model-stat"><div class="model-stat-val" style="font-size:1.4rem">{feats}</div><div class="model-stat-lbl">Features</div></div>
     </div>
-    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:0.6rem 0.8rem;font-size:0.76rem;color:#475569;line-height:1.7">
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:0.6rem 0.8rem;font-size:0.86rem;color:#475569;line-height:1.7">
         <div><b>Algorithm:</b> Random Forest</div>
         <div><b>Anomaly:</b> Isolation Forest — {iso}</div>
         <div><b>Dataset:</b> CICIDS2017</div>
     </div>
     <div style="margin-top:0.8rem">
-        <div style="display:flex;justify-content:space-between;font-size:0.7rem;color:#94a3b8;margin-bottom:0.3rem">
+        <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:#94a3b8;margin-bottom:0.3rem">
             <span>Model Confidence</span><span>{acc*100:.1f}%</span>
         </div>
         <div style="background:#f1f5f9;border-radius:99px;height:6px;overflow:hidden">
@@ -1027,10 +1027,10 @@ with col_ips:
                 <div class="ip-row">
                     <div>
                         <span class="ip-badge">{row['source_ip']}</span>
-                        <span style="font-size:0.68rem;color:{color};font-weight:600;margin-left:0.3rem">{row['top_attack']}</span>
+                        <span style="font-size:0.78rem;color:{color};font-weight:600;margin-left:0.3rem">{row['top_attack']}</span>
                     </div>
                     <div style="display:flex;align-items:center;gap:0.4rem">
-                        <span style="font-size:0.7rem;color:#94a3b8">{row['avg_risk']:.2f}</span>
+                        <span style="font-size:0.8rem;color:#94a3b8">{row['avg_risk']:.2f}</span>
                         <span class="count-badge">{row['attacks']}</span>
                     </div>
                 </div>""", unsafe_allow_html=True)
@@ -1140,7 +1140,7 @@ with col_export:
             use_container_width=True,
         )
         st.markdown(f"""
-        <div style="margin-top:0.8rem;font-size:0.75rem;color:#94a3b8;text-align:center">
+        <div style="margin-top:0.8rem;font-size:0.85rem;color:#94a3b8;text-align:center">
             {len(df_export)} records ready
         </div>""", unsafe_allow_html=True)
     else:
