@@ -82,27 +82,27 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ─── SOUND ALERT (JS) ─────────────────────────────────────────────────────────
+# Short beep encoded as base64 WAV (generated inline)
 ALERT_SOUND_JS = """
 <script>
 (function() {
-    function playAlert() {
-        try {
-            var ctx = new (window.AudioContext || window.webkitAudioContext)();
-            if (ctx.state === 'suspended') { ctx.resume(); }
-            function beep(freq, start, dur) {
-                var o = ctx.createOscillator();
-                var g = ctx.createGain();
-                o.connect(g); g.connect(ctx.destination);
-                o.frequency.value = freq; o.type = 'square';
-                g.gain.setValueAtTime(0.3, ctx.currentTime + start);
-                g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
-                o.start(ctx.currentTime + start);
-                o.stop(ctx.currentTime + start + dur);
-            }
-            beep(880, 0, 0.15); beep(660, 0.2, 0.15); beep(880, 0.4, 0.15);
-        } catch(e) { console.log('Audio error:', e); }
-    }
-    playAlert();
+    try {
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        function beep(freq, start, dur) {
+            var o = ctx.createOscillator();
+            var g = ctx.createGain();
+            o.connect(g); g.connect(ctx.destination);
+            o.frequency.value = freq; o.type = 'sine';
+            g.gain.setValueAtTime(1, ctx.currentTime + start);
+            g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+            o.start(ctx.currentTime + start);
+            o.stop(ctx.currentTime + start + dur + 0.05);
+        }
+        beep(880, 0.0, 0.2);
+        beep(660, 0.3, 0.2);
+        beep(880, 0.6, 0.3);
+        console.log("[CyberThreat] ALERT SOUND PLAYED");
+    } catch(e) { console.log('Audio error:', e); }
 })();
 </script>
 """
@@ -164,19 +164,12 @@ with st.sidebar:
     st.session_state.sound_enabled = st.checkbox("🔊 Sound Alerts", value=st.session_state.sound_enabled)
 
     if st.session_state.sound_enabled:
-        if st.button("🔔 Arm Sound (click once)"):
-            st.session_state.sound_armed = True
-            st.markdown("""<script>
-            var ctx = new (window.AudioContext || window.webkitAudioContext)();
-            var b = ctx.createBuffer(1,1,22050);
-            var s = ctx.createBufferSource();
-            s.buffer=b; s.connect(ctx.destination); s.start(0);
-            window._audioArmed=true;
-            </script>""", unsafe_allow_html=True)
-        if st.session_state.sound_armed:
-            st.success("🔊 Sound Armed!")
+        if not st.session_state.sound_armed:
+            if st.button("🔔 Arm Sound (click once)"):
+                st.session_state.sound_armed = True
+                st.rerun()
         else:
-            st.warning("⚠️ Click Arm Sound first")
+            st.success("🔊 Sound Armed!")
 
     st.markdown("---")
     st.markdown("**Legend**")
@@ -362,7 +355,7 @@ with alerts_col:
 
             # Block IP button for threats
             if attack != "Other" and not is_blocked:
-                if st.button(f"🚫 Block {ip}", key=f"block_{ip}_{ts}"):
+                if st.button(f"🚫 Block {ip}", key=f"block_{ip}"):
                     block_ip(ip)
                     st.rerun()
     else:
