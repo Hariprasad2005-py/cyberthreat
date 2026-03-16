@@ -220,6 +220,67 @@ if history and st.session_state.sound_enabled and st.session_state.sound_armed:
                 "action" : f"🔴 HIGH RISK: {p.get('attack_type')} from {p.get('source_ip')}",
                 "type"   : "alert"
             })
+        # ── BIG POPUP ALERT ──────────────────────────────────────────────────
+        latest = new_high[-1]
+        popup_html = f"""
+        <div id="cyberPopup" style="
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.75);
+            z-index: 999999;
+            display: flex; align-items: center; justify-content: center;
+            animation: fadeIn 0.3s ease;
+        ">
+            <div style="
+                background: linear-gradient(135deg, #1a0000, #3d0000);
+                border: 3px solid #ef4444;
+                border-radius: 20px;
+                padding: 50px 60px;
+                text-align: center;
+                max-width: 600px;
+                box-shadow: 0 0 60px #ef4444, 0 0 120px rgba(239,68,68,0.4);
+                animation: pulse 1s infinite;
+            ">
+                <div style="font-size: 5em; margin-bottom: 10px;">🚨</div>
+                <div style="
+                    color: #ef4444;
+                    font-size: 2.5em;
+                    font-weight: 900;
+                    letter-spacing: 3px;
+                    margin-bottom: 16px;
+                    text-transform: uppercase;
+                ">THREAT DETECTED</div>
+                <div style="color: #fca5a5; font-size: 1.4em; margin-bottom: 8px;">
+                    Attack Type: <b style="color:#ef4444;">{latest.get('attack_type','Unknown')}</b>
+                </div>
+                <div style="color: #fca5a5; font-size: 1.2em; margin-bottom: 8px;">
+                    Source IP: <b style="color:#fbbf24;">{latest.get('source_ip','N/A')}</b>
+                </div>
+                <div style="color: #fca5a5; font-size: 1.2em; margin-bottom: 30px;">
+                    Risk Score: <b style="color:#ef4444;">{latest.get('risk_score',0):.2f}</b> &nbsp;|&nbsp;
+                    Level: <b style="color:#ef4444;">HIGH</b>
+                </div>
+                <button onclick="document.getElementById('cyberPopup').style.display='none'"
+                    style="
+                        background: #ef4444; color: white;
+                        border: none; border-radius: 10px;
+                        padding: 14px 40px; font-size: 1.1em;
+                        font-weight: 700; cursor: pointer;
+                        letter-spacing: 1px;
+                    ">✕ DISMISS</button>
+            </div>
+        </div>
+        <style>
+        @keyframes pulse {{
+            0%   {{ box-shadow: 0 0 60px #ef4444, 0 0 120px rgba(239,68,68,0.4); }}
+            50%  {{ box-shadow: 0 0 100px #ef4444, 0 0 200px rgba(239,68,68,0.7); }}
+            100% {{ box-shadow: 0 0 60px #ef4444, 0 0 120px rgba(239,68,68,0.4); }}
+        }}
+        @keyframes fadeIn {{
+            from {{ opacity: 0; }} to {{ opacity: 1; }}
+        }}
+        </style>
+        """
+        st.markdown(popup_html, unsafe_allow_html=True)
 
 # ─── KPI METRICS ──────────────────────────────────────────────────────────────
 col1, col2, col3, col4, col5 = st.columns(5)
