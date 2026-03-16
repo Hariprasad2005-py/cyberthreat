@@ -256,6 +256,7 @@ total    = stats.get("total_requests", 0)
 high     = stats.get("high_risk_count", 0)
 avg_risk = stats.get("avg_risk_score", 0)
 anomaly  = stats.get("anomaly_count", 0)
+attack_counts = stats.get("attack_counts", {})
 high_pct = round(high / total * 100) if total else 0
 risk_color = "red" if avg_risk > 0.7 else "amber" if avg_risk > 0.4 else "green"
 
@@ -268,11 +269,11 @@ attacks_per_min = 0
 if history:
     try:
         df_rate = pd.DataFrame(history)
-        df_rate["ts"] = pd.to_datetime(df_rate["timestamp"], utc=True).dt.tz_localize(None)
+        df_rate["ts"] = pd.to_datetime(df_rate["timestamp"]).dt.tz_localize(None)
         cutoff = pd.Timestamp.utcnow().tz_localize(None) - pd.Timedelta(minutes=1)
         attacks_per_min = int((df_rate["ts"] >= cutoff).sum())
     except:
-        pass
+        attacks_per_min = len(history)
 rate_color = "red" if attacks_per_min > 20 else "amber" if attacks_per_min > 10 else "blue"
 
 k1,k2,k3,k4,k5,k6 = st.columns(6)
@@ -414,7 +415,6 @@ with col_map:
 with col_pie:
     st.markdown('<div class="chart-card">', unsafe_allow_html=True)
     st.markdown('<p class="section-header"><span class="dot" style="background:#6366f1"></span>Attack Distribution</p>', unsafe_allow_html=True)
-    attack_counts = stats.get("attack_counts", {})
     if attack_counts:
         df_pie = pd.DataFrame({"Attack": list(attack_counts.keys()), "Count": list(attack_counts.values())}).sort_values("Count", ascending=False)
         total_events = sum(attack_counts.values())
