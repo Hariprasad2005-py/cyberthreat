@@ -10,6 +10,7 @@ Flask API Backend
 """
 
 import os
+import json
 import time
 import random
 import threading
@@ -23,11 +24,13 @@ from datetime import datetime
 from sklearn.ensemble import IsolationForest
 
 # ─── PATHS ────────────────────────────────────────────────────────────────────
-BASE_DIR     = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODEL_PATH   = os.path.join(BASE_DIR, "model", "cyber_model.pkl")
-SCALER_PATH  = os.path.join(BASE_DIR, "model", "scaler.pkl")
-ENCODER_PATH = os.path.join(BASE_DIR, "model", "label_encoder.pkl")
-DATASET_PATH = os.path.join(BASE_DIR, "archive", "clean_dataset.csv")
+BASE_DIR         = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MODEL_PATH       = os.path.join(BASE_DIR, "model", "cyber_model.pkl")
+SCALER_PATH      = os.path.join(BASE_DIR, "model", "scaler.pkl")
+ENCODER_PATH     = os.path.join(BASE_DIR, "model", "label_encoder.pkl")
+DATASET_PATH     = os.path.join(BASE_DIR, "archive", "clean_dataset.csv")
+META_PATH        = os.path.join(BASE_DIR, "model", "model_meta.json")
+BLOCKED_IPS_FILE = os.path.join(BASE_DIR, "blocked_ips.json")
 
 # ─── APP SETUP ────────────────────────────────────────────────────────────────
 app = Flask(__name__)
@@ -35,9 +38,7 @@ CORS(app)
 
 prediction_history = []
 
-import json
-BLOCKED_IPS_FILE = os.path.join(BASE_DIR, "blocked_ips.json")
-
+# ─── BLOCKED IPs (persistent) ─────────────────────────────────────────────────
 def load_blocked_ips():
     if os.path.exists(BLOCKED_IPS_FILE):
         try:
@@ -55,6 +56,7 @@ def save_blocked_ips(ips):
         print(f"[WARN] Could not save blocked IPs: {e}")
 
 blocked_ips = load_blocked_ips()
+print(f"[INFO] Loaded {len(blocked_ips)} blocked IPs from disk.")
 
 # ─── LOAD MODEL ───────────────────────────────────────────────────────────────
 def load_artifacts():
@@ -69,14 +71,14 @@ def load_artifacts():
 
 clf, scaler, encoder = load_artifacts()
 
-# ─── ISOLATION FOREST SETUP ───────────────────────────────────────────────────
+# ─── ISOLATION FOREST ─────────────────────────────────────────────────────────
 isolation_forest  = None
 iso_forest_fitted = False
 
 def fit_isolation_forest(X):
     global isolation_forest, iso_forest_fitted
     print("[INFO] Fitting Isolation Forest...")
-    isolation_forest  = IsolationForest(contamination=0.05, random_state=42, n_estimators=100)
+    isolation_forest = IsolationForest(contamination=0.05, random_state=42, n_estimators=100)
     isolation_forest.fit(X)
     iso_forest_fitted = True
     print("[INFO] Isolation Forest fitted.")
@@ -93,7 +95,7 @@ def load_and_fit_iso_forest():
         if scaler is not None:
             expected = scaler.n_features_in_
             if X.shape[1] < expected:
-                X = np.pad(X, ((0,0),(0, expected - X.shape[1])))
+                X = np.pad(X, ((0, 0), (0, expected - X.shape[1])))
             elif X.shape[1] > expected:
                 X = X[:, :expected]
             X = scaler.transform(X)
@@ -123,7 +125,7 @@ def preprocess_input(data):
     vec      = np.array(list(data.values()), dtype=float).reshape(1, -1)
     expected = scaler.n_features_in_
     if vec.shape[1] < expected:
-        vec = np.pad(vec, ((0,0),(0, expected - vec.shape[1])))
+        vec = np.pad(vec, ((0, 0), (0, expected - vec.shape[1])))
     elif vec.shape[1] > expected:
         vec = vec[:, :expected]
     return scaler.transform(vec)
@@ -174,7 +176,8 @@ def index():
     return jsonify({
         "service"  : "CyberThreat Detection API",
         "version"  : "2.0.0",
-        "endpoints": ["/predict", "/history", "/stats", "/health", "/model_info"],
+        "endpoints": ["/predict", "/history", "/stats", "/health", "/model_info",
+                      "/blocked_ips", "/block_ip", "/unblock_ip"],
     })
 
 @app.route("/health", methods=["GET"])
@@ -187,20 +190,40 @@ def health():
 
 @app.route("/model_info", methods=["GET"])
 def model_info():
-    info = {
-        "accuracy"              : 0.97,
-        "n_estimators"          : 100,
-        "n_features"            : int(scaler.n_features_in_) if scaler else 78,
-        "anomaly_contamination" : 0.05,
-        "iso_forest_fitted"     : iso_forest_fitted,
-        "model_type"            : "RandomForestClassifier + IsolationForest",
-        "classes"               : list(encoder.classes_) if encoder else [],
-    }
+    # ── Live confidence calculated from every prediction in history ───────────
+    avg_confidence = 0.0
+    min_confidence = 0.0
+    max_confidence = 0.0
+    total_analysed = len(prediction_history)
+
+    if prediction_history:
+        confidences    = [p.get("confidence", 0) for p in prediction_history[-100:]]
+        avg_confidence = round(sum(confidences) / len(confidences), 4)
+        min_confidence = round(min(confidences), 4)
+        max_confidence = round(max(confidences), 4)
+
+    # ── Real trained accuracy — read from model_meta.json saved by train_model.py
+    trained_accuracy = None
     try:
-        if clf is not None:
-            info["n_estimators"] = clf.n_estimators
-    except Exception:
+        with open(META_PATH) as f:
+            trained_accuracy = json.load(f).get("accuracy")
+    except:
         pass
+
+    info = {
+        "accuracy"             : trained_accuracy,
+        "live_confidence"      : avg_confidence,
+        "min_confidence"       : min_confidence,
+        "max_confidence"       : max_confidence,
+        "total_analysed"       : total_analysed,
+        "n_estimators"         : clf.n_estimators if clf is not None else 100,
+        "n_features"           : int(scaler.n_features_in_) if scaler is not None else 26,
+        "anomaly_contamination": 0.05,
+        "iso_forest_fitted"    : iso_forest_fitted,
+        "model_type"           : "RandomForestClassifier + IsolationForest",
+        "classes"              : list(encoder.classes_) if encoder is not None else [],
+    }
+
     return jsonify(info)
 
 @app.route("/predict", methods=["POST"])
@@ -221,7 +244,6 @@ def predict():
         attack    = encoder.inverse_transform([pred_idx])[0]
         risk      = compute_risk(attack, proba_max)
 
-        # Isolation Forest anomaly detection
         is_anomaly = False
         if iso_forest_fitted and isolation_forest is not None:
             iso_pred   = isolation_forest.predict(X)
@@ -291,7 +313,7 @@ def get_blocked_ips():
 @app.route("/block_ip", methods=["POST"])
 def block_ip():
     data = request.get_json(force=True)
-    ip = data.get("ip")
+    ip   = data.get("ip")
     if ip and ip not in blocked_ips:
         blocked_ips.append(ip)
         save_blocked_ips(blocked_ips)
@@ -300,7 +322,7 @@ def block_ip():
 @app.route("/unblock_ip", methods=["POST"])
 def unblock_ip():
     data = request.get_json(force=True)
-    ip = data.get("ip")
+    ip   = data.get("ip")
     if ip in blocked_ips:
         blocked_ips.remove(ip)
         save_blocked_ips(blocked_ips)
@@ -309,7 +331,7 @@ def unblock_ip():
 # ─── MAIN ─────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     print("=" * 50)
-    print("  CyberThreat Detection API v2.0 — Starting …")
+    print("  CyberThreat Detection API v2.0 — Starting ...")
     print("=" * 50)
 
     t1 = threading.Thread(target=load_and_fit_iso_forest, daemon=True)
