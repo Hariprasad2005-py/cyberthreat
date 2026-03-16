@@ -18,7 +18,6 @@ API_BASE = "https://cyberthreat-api.onrender.com"
 REFRESH_SECS = 5
 HISTORY_LIMIT = 100
 
-
 ATTACK_COLORS = {
     "Other": "#ec4899",
     "DDoS": "#ef4444",
@@ -26,7 +25,6 @@ ATTACK_COLORS = {
     "Port Scan": "#f97316",
     "Brute Force": "#3b82f6",
 }
-
 
 # ───────── PAGE CONFIG ─────────
 
@@ -82,47 +80,36 @@ def fetch_history():
             return r.json()
     except:
         st.warning("⚠️ API connection failed")
-
     return []
 
 
 def fetch_stats():
     try:
         r = requests.get(f"{API_BASE}/stats", timeout=3)
-
         if r.status_code == 200:
             return r.json()
-
     except:
         pass
-
     return {}
 
 
 def fetch_model():
     try:
         r = requests.get(f"{API_BASE}/model_info", timeout=3)
-
         if r.status_code == 200:
             return r.json()
-
     except:
         pass
-
     return {}
 
 
 def fetch_blocked():
-
     try:
         r = requests.get(f"{API_BASE}/blocked_ips", timeout=3)
-
         if r.status_code == 200:
             return r.json()
-
     except:
         pass
-
     return []
 
 
@@ -154,6 +141,11 @@ def unblock_ip(ip):
     except:
         pass
 
+    st.session_state.alert_log.append({
+        "time": datetime.now().strftime("%H:%M:%S"),
+        "action": f"✅ Unblocked IP {ip}"
+    })
+
 
 # ───────── SIDEBAR ─────────
 
@@ -172,21 +164,27 @@ with st.sidebar:
 
     st.subheader("Blocked IPs")
 
-    blocked_ips = fetch_blocked()
+    blocked_ips_sidebar = fetch_blocked()
 
-    for ip in blocked_ips:
+    if blocked_ips_sidebar:
 
-        col1, col2 = st.columns([4,1])
+        for ip in blocked_ips_sidebar:
 
-        with col1:
-            st.write(ip)
+            col1, col2 = st.columns([4,1])
 
-        with col2:
+            with col1:
+                st.code(ip)
 
-            if st.button("❌", key=f"unblock_{ip}"):
+            with col2:
 
-                unblock_ip(ip)
-                st.rerun()
+                if st.button("❌", key=f"unblock_{ip}"):
+
+                    unblock_ip(ip)
+                    time.sleep(0.4)
+                    st.rerun()
+
+    else:
+        st.success("No blocked IPs")
 
 
 # ───────── HEADER ─────────
@@ -202,6 +200,8 @@ st.markdown("---")
 history = fetch_history()
 stats = fetch_stats()
 model = fetch_model()
+
+# IMPORTANT: fetch AFTER actions
 blocked_ips = fetch_blocked()
 
 
@@ -225,6 +225,8 @@ if history and st.session_state.sound_enabled:
 
 # ───────── KPI DASHBOARD ─────────
 
+blocked_ips = fetch_blocked()
+
 c1,c2,c3,c4 = st.columns(4)
 
 with c1:
@@ -237,7 +239,7 @@ with c3:
     st.metric("Avg Risk Score", round(stats.get("avg_risk_score",0),2))
 
 with c4:
-    st.metric("Blocked IPs", len(blocked_ips))
+    st.metric("🚫 Blocked IPs", len(blocked_ips))
 
 
 st.markdown("---")
@@ -338,6 +340,7 @@ if history:
             if st.button(f"🚫 Block {ip}", key=f"block_{ip}_{idx}"):
 
                 block_ip(ip)
+                time.sleep(0.4)
                 st.rerun()
 
 
@@ -366,8 +369,13 @@ if history:
 
 st.subheader("Action Log")
 
-for log in reversed(st.session_state.alert_log[-10:]):
-    st.write(log["time"],log["action"])
+if st.session_state.alert_log:
+
+    for log in reversed(st.session_state.alert_log[-10:]):
+        st.write(f"{log['time']} | {log['action']}")
+
+else:
+    st.info("No actions yet.")
 
 
 # ───────── AUTO REFRESH ─────────
