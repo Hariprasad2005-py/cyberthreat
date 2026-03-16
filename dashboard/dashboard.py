@@ -212,7 +212,11 @@ section[data-testid="stSidebar"] hr { border-color:#1e293b !important; }
 """, unsafe_allow_html=True)
 
 # ─── THREE.JS NETWORK — 5-second intro splash then auto-hides ────────────────
-components.html("""
+_splash = st.empty()
+_splash.components_html = None
+
+with _splash.container():
+    components.html("""
 <!DOCTYPE html>
 <html>
 <head>
@@ -249,25 +253,28 @@ canvas { display:block; width:100% !important; height:100% !important; }
 }
 
 #title-text {
-    font-size: 1.6rem;
-    font-weight: 800;
+    font-size: 2rem;
+    font-weight: 900;
     color: white;
     letter-spacing: -0.02em;
     text-align: center;
     opacity: 0;
     transform: translateY(12px);
     animation: fadeUp 0.8s ease 0.3s forwards;
+    text-shadow: 0 0 30px rgba(99,102,241,0.6), 0 2px 8px rgba(0,0,0,0.4);
 }
 
 #sub-text {
-    font-size: 0.78rem;
-    color: rgba(148,163,184,0.9);
-    letter-spacing: 0.12em;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: rgba(226,232,240,0.95);
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    margin-top: 0.5rem;
+    margin-top: 0.6rem;
     text-align: center;
     opacity: 0;
     animation: fadeUp 0.8s ease 0.6s forwards;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.3);
 }
 
 #countdown-ring {
@@ -492,7 +499,10 @@ setTimeout(function() {
 </script>
 </body>
 </html>
-""", height=520, scrolling=False)
+    """, height=520, scrolling=False)
+
+time.sleep(5.8)
+_splash.empty()  # removes entire iframe — all content jumps up instantly
 
 # ─── SESSION STATE ────────────────────────────────────────────────────────────
 for k, v in [("alerted_ids", set()), ("alert_log", []), ("sound_enabled", True)]:
