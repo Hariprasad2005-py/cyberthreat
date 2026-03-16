@@ -680,10 +680,9 @@ with col_export:
             summary_lines.append(f"  {att:<18}: {cnt}")
         summary_txt = "\n".join(summary_lines).encode("utf-8")
         st.download_button(
-            label="⬇️ Download Report (TXT)",
-            data=summary_txt,
-            file_name=f"threat_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-            mime="text/plain",
+label="⬇️ Download Report (PDF)",            data=summary_txt,
+file_name=f"threat_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+mime="application/pdf",
             use_container_width=True,
         )
         st.markdown(f"""
