@@ -63,26 +63,75 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ─── CUSTOM CSS ───────────────────────────────────────────────────────────────
+# ─── THREE.JS NETWORK BACKGROUND ──────────────────────────────────────────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
-.main .block-container { padding: 1.5rem 2rem 2rem 2rem; max-width: 1400px; }
+/* ── Gradient background ── */
+[data-testid="stAppViewContainer"] {
+    background: linear-gradient(135deg,
+        #f0f7ff 0%,
+        #e8f4fd 20%,
+        #ffffff 45%,
+        #f0f9ff 70%,
+        #dbeafe 100%
+    ) !important;
+    background-attachment: fixed !important;
+}
+[data-testid="stAppViewContainer"]::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background:
+        radial-gradient(ellipse at 15% 20%, rgba(99,102,241,0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 85% 80%, rgba(59,130,246,0.10) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.6) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Three.js canvas fixed behind everything */
+#threejs-bg {
+    position: fixed !important;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.55;
+}
+
+/* Ensure content sits above canvas */
+[data-testid="stAppViewContainer"] > div {
+    position: relative;
+    z-index: 1;
+}
+section[data-testid="stSidebar"] {
+    z-index: 100 !important;
+}
+
+.main .block-container { padding: 1.5rem 2rem 2rem 2rem; max-width: 1400px; position:relative; z-index:1; }
 #MainMenu, footer, header { visibility: hidden; }
 
+/* ── KPI Cards — glass morphism ── */
 .kpi-card {
-    background: white;
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border-radius: 16px;
     padding: 1.4rem 1.6rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
-    border: 1px solid #f1f5f9;
+    box-shadow: 0 2px 8px rgba(99,102,241,0.08), 0 4px 24px rgba(59,130,246,0.06);
+    border: 1px solid rgba(255,255,255,0.9);
     position: relative; overflow: hidden;
     transition: transform 0.2s, box-shadow 0.2s;
 }
-.kpi-card:hover { transform: translateY(-2px); box-shadow: 0 4px 24px rgba(0,0,0,0.10); }
+.kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(99,102,241,0.14);
+    background: rgba(255,255,255,0.95);
+}
 .kpi-card::before {
     content:''; position:absolute; top:0; left:0; right:0; height:3px; border-radius:16px 16px 0 0;
 }
@@ -108,10 +157,15 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 }
 .section-header .dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
 
+/* ── Chart cards — glass morphism ── */
 .chart-card {
-    background:white; border-radius:16px; padding:1.4rem 1.6rem;
-    box-shadow:0 1px 3px rgba(0,0,0,0.08),0 4px 16px rgba(0,0,0,0.06);
-    border:1px solid #f1f5f9; margin-bottom:1rem;
+    background: rgba(255,255,255,0.82);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 16px; padding: 1.4rem 1.6rem;
+    box-shadow: 0 2px 8px rgba(99,102,241,0.07), 0 4px 20px rgba(59,130,246,0.05);
+    border: 1px solid rgba(255,255,255,0.88);
+    margin-bottom: 1rem;
 }
 
 .alert-row {
@@ -119,9 +173,9 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     padding:0.6rem 0.9rem; border-radius:10px; margin-bottom:0.45rem;
     font-size:0.8rem; font-weight:500;
 }
-.alert-high   { background:#fff1f2; border-left:3px solid #ef4444; }
-.alert-medium { background:#fffbeb; border-left:3px solid #f59e0b; }
-.alert-low    { background:#f0fdf4; border-left:3px solid #22c55e; }
+.alert-high   { background:rgba(255,241,242,0.9); border-left:3px solid #ef4444; }
+.alert-medium { background:rgba(255,251,235,0.9); border-left:3px solid #f59e0b; }
+.alert-low    { background:rgba(240,253,244,0.9); border-left:3px solid #22c55e; }
 .alert-tag { font-size:0.68rem; font-weight:700; padding:2px 7px; border-radius:99px; letter-spacing:0.05em; }
 .tag-high   { background:#fee2e2; color:#ef4444; }
 .tag-medium { background:#fef3c7; color:#d97706; }
@@ -129,16 +183,16 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
 .ip-row {
     display:flex; justify-content:space-between; align-items:center;
-    padding:0.5rem 0; border-bottom:1px solid #f1f5f9; font-size:0.8rem;
+    padding:0.5rem 0; border-bottom:1px solid rgba(241,245,249,0.8); font-size:0.8rem;
 }
 .ip-badge {
     font-family:'JetBrains Mono',monospace; font-size:0.76rem;
-    background:#f8fafc; border:1px solid #e2e8f0;
+    background:rgba(248,250,252,0.9); border:1px solid #e2e8f0;
     padding:2px 7px; border-radius:6px; color:#334155;
 }
 .count-badge { background:#ef4444; color:white; font-size:0.68rem; font-weight:700; padding:2px 7px; border-radius:99px; }
 
-.model-stat { text-align:center; padding:0.9rem; background:#f8fafc; border-radius:12px; border:1px solid #e2e8f0; }
+.model-stat { text-align:center; padding:0.9rem; background:rgba(248,250,252,0.9); border-radius:12px; border:1px solid #e2e8f0; }
 .model-stat-val { font-size:1.5rem; font-weight:800; color:#6366f1; }
 .model-stat-lbl { font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#94a3b8; margin-top:0.2rem; }
 
@@ -148,12 +202,158 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(1.4)} }
 .pulse-dot { width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;animation:pulse 1.8s infinite;margin-right:5px; }
 
-section[data-testid="stSidebar"] { background:#0f172a !important; }
+section[data-testid="stSidebar"] { background: rgba(15,23,42,0.97) !important; backdrop-filter:blur(20px); }
 section[data-testid="stSidebar"] * { color:#e2e8f0 !important; }
 section[data-testid="stSidebar"] hr { border-color:#1e293b !important; }
 .status-online  { color:#22c55e !important; font-weight:600; font-size:0.82rem; }
 .status-offline { color:#ef4444 !important; font-weight:600; font-size:0.82rem; }
 </style>
+
+<!-- THREE.JS NETWORK VISUALIZATION -->
+<canvas id="threejs-bg"></canvas>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function() {
+    var canvas = document.getElementById('threejs-bg');
+    if (!canvas) return;
+
+    var renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x000000, 0);
+
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.z = 80;
+
+    /* ── Nodes (network packets / IP addresses) ── */
+    var nodeCount = 90;
+    var nodes = [];
+    var nodeGeom = new THREE.SphereGeometry(0.45, 8, 8);
+
+    var colors = [0x6366f1, 0x3b82f6, 0x60a5fa, 0x93c5fd, 0x1d4ed8];
+
+    for (var i = 0; i < nodeCount; i++) {
+        var mat = new THREE.MeshBasicMaterial({
+            color: colors[Math.floor(Math.random() * colors.length)],
+            transparent: true,
+            opacity: Math.random() * 0.5 + 0.2
+        });
+        var mesh = new THREE.Mesh(nodeGeom, mat);
+        mesh.position.set(
+            (Math.random() - 0.5) * 180,
+            (Math.random() - 0.5) * 100,
+            (Math.random() - 0.5) * 60
+        );
+        mesh.userData = {
+            vx: (Math.random() - 0.5) * 0.06,
+            vy: (Math.random() - 0.5) * 0.04,
+            vz: (Math.random() - 0.5) * 0.03,
+            pulseSpeed: Math.random() * 0.02 + 0.005,
+            pulseOffset: Math.random() * Math.PI * 2
+        };
+        scene.add(mesh);
+        nodes.push(mesh);
+    }
+
+    /* ── Edges (connections between nodes) ── */
+    var edgeMaterial = new THREE.LineBasicMaterial({
+        color: 0x6366f1,
+        transparent: true,
+        opacity: 0.12
+    });
+
+    var edgeLines = [];
+    var connectionDist = 38;
+
+    function rebuildEdges() {
+        edgeLines.forEach(function(l) { scene.remove(l); });
+        edgeLines = [];
+        for (var i = 0; i < nodes.length; i++) {
+            for (var j = i + 1; j < nodes.length; j++) {
+                var d = nodes[i].position.distanceTo(nodes[j].position);
+                if (d < connectionDist) {
+                    var points = [nodes[i].position.clone(), nodes[j].position.clone()];
+                    var geom = new THREE.BufferGeometry().setFromPoints(points);
+                    var line = new THREE.Line(geom, edgeMaterial.clone());
+                    line.material.opacity = (1 - d / connectionDist) * 0.18;
+                    scene.add(line);
+                    edgeLines.push(line);
+                }
+            }
+        }
+    }
+
+    /* ── Animated data packets travelling along edges ── */
+    var packetGeom = new THREE.SphereGeometry(0.25, 6, 6);
+    var packetMat  = new THREE.MeshBasicMaterial({ color: 0xef4444, transparent:true, opacity:0.9 });
+    var packets = [];
+
+    function spawnPacket() {
+        var a = Math.floor(Math.random() * nodes.length);
+        var b = Math.floor(Math.random() * nodes.length);
+        if (a === b) return;
+        var mesh = new THREE.Mesh(packetGeom, packetMat.clone());
+        mesh.material.color.setHex(Math.random() > 0.6 ? 0xef4444 : 0x6366f1);
+        scene.add(mesh);
+        packets.push({ mesh: mesh, from: nodes[a].position, to: nodes[b].position, t: 0, speed: 0.012 + Math.random()*0.012 });
+    }
+
+    for (var p = 0; p < 12; p++) spawnPacket();
+
+    var clock = new THREE.Clock();
+    var frameCount = 0;
+
+    function animate() {
+        requestAnimationFrame(animate);
+        var t = clock.getElapsedTime();
+        frameCount++;
+
+        /* Pulse nodes */
+        nodes.forEach(function(n) {
+            var s = 1 + 0.25 * Math.sin(t * n.userData.pulseSpeed * 60 + n.userData.pulseOffset);
+            n.scale.setScalar(s);
+            n.position.x += n.userData.vx;
+            n.position.y += n.userData.vy;
+            n.position.z += n.userData.vz;
+            if (Math.abs(n.position.x) > 90) n.userData.vx *= -1;
+            if (Math.abs(n.position.y) > 50) n.userData.vy *= -1;
+            if (Math.abs(n.position.z) > 30) n.userData.vz *= -1;
+        });
+
+        /* Rebuild edges every 40 frames */
+        if (frameCount % 40 === 0) rebuildEdges();
+
+        /* Move packets */
+        packets.forEach(function(pk, idx) {
+            pk.t += pk.speed;
+            if (pk.t >= 1) {
+                scene.remove(pk.mesh);
+                packets.splice(idx, 1);
+                spawnPacket();
+                return;
+            }
+            pk.mesh.position.lerpVectors(pk.from, pk.to, pk.t);
+        });
+
+        /* Slow camera drift */
+        camera.position.x = Math.sin(t * 0.04) * 8;
+        camera.position.y = Math.cos(t * 0.03) * 4;
+        camera.lookAt(scene.position);
+
+        renderer.render(scene, camera);
+    }
+
+    rebuildEdges();
+    animate();
+
+    window.addEventListener('resize', function() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+})();
+</script>
 """, unsafe_allow_html=True)
 
 # ─── SESSION STATE ────────────────────────────────────────────────────────────
