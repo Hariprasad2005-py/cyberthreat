@@ -15,7 +15,7 @@ from datetime import datetime
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
 API_BASE      = "https://cyberthreat-api.onrender.com"
-REFRESH_SECS  = 5
+REFRESH_SECS  = 3
 HISTORY_LIMIT = 100
 
 ATTACK_COLORS = {
@@ -501,8 +501,8 @@ setTimeout(function() {
 </html>
     """, height=520, scrolling=False)
 
-time.sleep(5.8)
-_splash.empty()  # removes entire iframe — all content jumps up instantly
+time.sleep(0)
+_splash.empty()
 
 # ─── SESSION STATE ────────────────────────────────────────────────────────────
 for k, v in [("alerted_ids", set()), ("alert_log", []), ("sound_enabled", True)]:
@@ -556,7 +556,7 @@ with st.sidebar:
     st.session_state.sound_enabled = st.checkbox("🔔  Sound Alerts", st.session_state.sound_enabled)
     st.markdown("---")
     try:
-        h = requests.get(f"{API_BASE}/health", timeout=6)
+        h = requests.get(f"{API_BASE}/health", timeout=2)
         if h.status_code == 200:
             st.markdown('<p class="status-online">● API Online</p>', unsafe_allow_html=True)
         else:
@@ -572,9 +572,14 @@ with st.sidebar:
         st.caption("No actions yet")
 
 # ─── FETCH ────────────────────────────────────────────────────────────────────
-history  = fetch_history()
-stats    = fetch_stats()
-model    = fetch_model()
+import concurrent.futures
+with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
+    f1 = ex.submit(fetch_history)
+    f2 = ex.submit(fetch_stats)
+    f3 = ex.submit(fetch_model)
+    history = f1.result()
+    stats   = f2.result()
+    model   = f3.result()
 
 # ─── SOUND ────────────────────────────────────────────────────────────────────
 if history and st.session_state.sound_enabled:
