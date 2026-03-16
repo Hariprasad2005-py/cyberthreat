@@ -411,6 +411,7 @@ with col_alerts:
     st.markdown('<div class="chart-card">', unsafe_allow_html=True)
     st.markdown('<p class="section-header"><span class="dot" style="background:#ef4444"></span>Live Threat Alerts</p>', unsafe_allow_html=True)
     if history:
+        blocked_ips = fetch_blocked()   # ← ADD THIS LINE
         for idx, pred in enumerate(reversed(history[-8:])):
             attack = pred.get("attack_type", "?")
             ip     = pred.get("source_ip", "?")
