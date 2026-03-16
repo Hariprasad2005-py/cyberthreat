@@ -34,6 +34,7 @@ app = Flask(__name__)
 CORS(app)
 
 prediction_history = []
+blocked_ips = []
 
 # ─── LOAD MODEL ───────────────────────────────────────────────────────────────
 def load_artifacts():
@@ -262,6 +263,26 @@ def stats():
         "high_risk_count": high_risk,
         "anomaly_count"  : anomaly_count,
     }), 200
+
+@app.route("/blocked_ips", methods=["GET"])
+def get_blocked_ips():
+    return jsonify(blocked_ips), 200
+
+@app.route("/block_ip", methods=["POST"])
+def block_ip():
+    data = request.get_json(force=True)
+    ip = data.get("ip")
+    if ip and ip not in blocked_ips:
+        blocked_ips.append(ip)
+    return jsonify({"status": "blocked", "ip": ip}), 200
+
+@app.route("/unblock_ip", methods=["POST"])
+def unblock_ip():
+    data = request.get_json(force=True)
+    ip = data.get("ip")
+    if ip in blocked_ips:
+        blocked_ips.remove(ip)
+    return jsonify({"status": "unblocked", "ip": ip}), 200
 
 # ─── MAIN ─────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":

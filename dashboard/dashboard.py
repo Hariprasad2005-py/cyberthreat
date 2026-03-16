@@ -37,6 +37,16 @@ st.set_page_config(
 st.success("AI Model: Random Forest + Isolation Forest | Real-time Threat Detection")
 st.info("AI Cyber Threat Detection using Random Forest + Isolation Forest trained on network traffic patterns.")
 
+# ── API health status ──
+try:
+    _health = requests.get(f"{API_BASE}/health", timeout=8)
+    if _health.status_code == 200:
+        st.success(f"✅ API Online — {API_BASE}")
+    else:
+        st.error(f"❌ API returned {_health.status_code}")
+except:
+    st.error("❌ API Offline — Render free tier may be waking up (wait ~30s and refresh)")
+
 
 # ───────── SESSION STATE ─────────
 
@@ -75,17 +85,17 @@ playSound();
 
 def fetch_history():
     try:
-        r = requests.get(f"{API_BASE}/history?limit={HISTORY_LIMIT}", timeout=3)
+        r = requests.get(f"{API_BASE}/history?limit={HISTORY_LIMIT}", timeout=10)
         if r.status_code == 200:
             return r.json()
     except:
-        st.warning("⚠️ API connection failed")
+        st.warning("⚠️ API connection failed — Render may be waking up (free tier). Retrying...")
     return []
 
 
 def fetch_stats():
     try:
-        r = requests.get(f"{API_BASE}/stats", timeout=3)
+        r = requests.get(f"{API_BASE}/stats", timeout=10)
         if r.status_code == 200:
             return r.json()
     except:
@@ -95,7 +105,7 @@ def fetch_stats():
 
 def fetch_model():
     try:
-        r = requests.get(f"{API_BASE}/model_info", timeout=3)
+        r = requests.get(f"{API_BASE}/model_info", timeout=10)
         if r.status_code == 200:
             return r.json()
     except:
@@ -105,7 +115,7 @@ def fetch_model():
 
 def fetch_blocked():
     try:
-        r = requests.get(f"{API_BASE}/blocked_ips", timeout=3)
+        r = requests.get(f"{API_BASE}/blocked_ips", timeout=10)
         if r.status_code == 200:
             return r.json()
     except:
