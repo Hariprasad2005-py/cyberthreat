@@ -259,7 +259,23 @@ anomaly  = stats.get("anomaly_count", 0)
 high_pct = round(high / total * 100) if total else 0
 risk_color = "red" if avg_risk > 0.7 else "amber" if avg_risk > 0.4 else "green"
 
-k1,k2,k3,k4 = st.columns(4)
+# Live confidence from model_info
+live_conf     = float(model.get("live_confidence") or 0)
+live_conf_pct = round(live_conf * 100, 1)
+
+# Attacks per minute — count events in last 60s
+attacks_per_min = 0
+if history:
+    try:
+        df_rate = pd.DataFrame(history)
+        df_rate["ts"] = pd.to_datetime(df_rate["timestamp"], utc=True).dt.tz_localize(None)
+        cutoff = pd.Timestamp.utcnow().tz_localize(None) - pd.Timedelta(minutes=1)
+        attacks_per_min = int((df_rate["ts"] >= cutoff).sum())
+    except:
+        pass
+rate_color = "red" if attacks_per_min > 20 else "amber" if attacks_per_min > 10 else "blue"
+
+k1,k2,k3,k4,k5,k6 = st.columns(6)
 with k1:
     st.markdown(f'<div class="kpi-card blue"><div class="kpi-label">Total Requests</div><div class="kpi-value blue">{total:,}</div><div class="kpi-sub">Events analyzed</div></div>', unsafe_allow_html=True)
 with k2:
@@ -268,10 +284,80 @@ with k3:
     st.markdown(f'<div class="kpi-card {risk_color}"><div class="kpi-label">Avg Risk Score</div><div class="kpi-value {risk_color}">{avg_risk:.2f}</div><div class="kpi-sub">0 = safe · 1 = critical</div></div>', unsafe_allow_html=True)
 with k4:
     st.markdown(f'<div class="kpi-card amber"><div class="kpi-label">Anomalies</div><div class="kpi-value amber">{anomaly:,}</div><div class="kpi-sub">Isolation Forest</div></div>', unsafe_allow_html=True)
+with k5:
+    st.markdown(f'<div class="kpi-card green"><div class="kpi-label">Live Confidence</div><div class="kpi-value green">{live_conf_pct}%</div><div class="kpi-sub">Avg model confidence</div></div>', unsafe_allow_html=True)
+with k6:
+    st.markdown(f'<div class="kpi-card {rate_color}"><div class="kpi-label">Attacks / Min</div><div class="kpi-value {rate_color}">{attacks_per_min}</div><div class="kpi-sub">Last 60 seconds</div></div>', unsafe_allow_html=True)
 
 st.markdown("<div style='margin-bottom:1rem'></div>", unsafe_allow_html=True)
 
-# ─── ROW 2: GLOBAL THREAT MAP + DONUT ─────────────────────────────────────────
+# ─── THREAT SEVERITY GAUGE ────────────────────────────────────────────────────
+col_gauge, col_gauge_info = st.columns([1, 3])
+with col_gauge:
+    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+    st.markdown('<p class="section-header"><span class="dot" style="background:#ef4444"></span>Threat Severity</p>', unsafe_allow_html=True)
+    gauge_val = round(avg_risk * 100)
+    if avg_risk > 0.75:
+        gauge_label, gauge_color = "CRITICAL", "#ef4444"
+    elif avg_risk > 0.5:
+        gauge_label, gauge_color = "HIGH", "#f97316"
+    elif avg_risk > 0.25:
+        gauge_label, gauge_color = "MEDIUM", "#f59e0b"
+    else:
+        gauge_label, gauge_color = "LOW", "#22c55e"
+    fig_gauge = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=gauge_val,
+        number={"suffix": "%", "font": {"size": 28, "family": "Inter", "color": gauge_color}},
+        gauge={
+            "axis": {"range": [0, 100], "tickwidth": 1, "tickcolor": "#94a3b8",
+                     "tickfont": {"size": 10, "color": "#94a3b8"}},
+            "bar": {"color": gauge_color, "thickness": 0.25},
+            "bgcolor": "white",
+            "borderwidth": 0,
+            "steps": [
+                {"range": [0,  25],  "color": "#dcfce7"},
+                {"range": [25, 50],  "color": "#fef9c3"},
+                {"range": [50, 75],  "color": "#ffedd5"},
+                {"range": [75, 100], "color": "#fee2e2"},
+            ],
+            "threshold": {"line": {"color": gauge_color, "width": 3},
+                          "thickness": 0.8, "value": gauge_val},
+        },
+    ))
+    fig_gauge.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)", margin=dict(l=20,r=20,t=30,b=10), height=200,
+        annotations=[dict(text=f"<b>{gauge_label}</b>", x=0.5, y=0.2,
+                          font=dict(size=16, color=gauge_color, family="Inter"),
+                          showarrow=False)]
+    )
+    st.plotly_chart(fig_gauge, use_container_width=True, config={"displayModeBar": False})
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with col_gauge_info:
+    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+    st.markdown('<p class="section-header"><span class="dot" style="background:#6366f1"></span>🧠 Threat Intelligence Summary</p>', unsafe_allow_html=True)
+    if history and attack_counts:
+        top_attack   = max(attack_counts, key=attack_counts.get)
+        top_count    = attack_counts[top_attack]
+        recent       = history[-1] if history else {}
+        recent_ip    = recent.get("source_ip", "N/A")
+        recent_risk  = recent.get("risk_score", 0)
+        recent_ts    = recent.get("timestamp","")[:19].replace("T"," ")
+        anomaly_rate = round(anomaly / total * 100) if total else 0
+        summary_color = gauge_color
+        st.markdown(f"""
+        <div style="background:#f8fafc;border-radius:12px;padding:1rem 1.2rem;border:1px solid #e2e8f0;font-size:0.83rem;color:#334155;line-height:1.9">
+            <div>🔴 <b>Dominant Threat:</b> <span style="color:{ATTACK_COLORS.get(top_attack,'#334155')};font-weight:700">{top_attack}</span> — {top_count} events detected</div>
+            <div>⚡ <b>Current Threat Level:</b> <span style="color:{summary_color};font-weight:700">{gauge_label}</span> (Risk Score: {avg_risk:.2f})</div>
+            <div>🌐 <b>Latest Source IP:</b> <span style="font-family:'JetBrains Mono',monospace">{recent_ip}</span> — Risk {recent_risk:.2f} at {recent_ts[11:]}</div>
+            <div>🤖 <b>Anomaly Rate:</b> {anomaly_rate}% of traffic flagged by Isolation Forest</div>
+            <div>📡 <b>Attack Rate:</b> {attacks_per_min} events/min — model confidence at {live_conf_pct}%</div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.info("Waiting for threat data to generate summary…")
+    st.markdown('</div>', unsafe_allow_html=True)
 col_map, col_pie = st.columns([3, 2])
 
 with col_map:
@@ -525,7 +611,92 @@ with col_bar:
         st.info("Waiting for data…")
     st.markdown('</div>', unsafe_allow_html=True)
 
+# ─── ROW 5: NETWORK TRAFFIC VOLUME + EXPORT ───────────────────────────────────
+col_traffic, col_export = st.columns([3, 1])
+
+with col_traffic:
+    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+    st.markdown('<p class="section-header"><span class="dot" style="background:#6366f1"></span>Network Traffic Volume</p>', unsafe_allow_html=True)
+    if history:
+        df_vol = pd.DataFrame(history)
+        df_vol["timestamp"] = pd.to_datetime(df_vol["timestamp"])
+        df_vol = df_vol.sort_values("timestamp")
+        # Bucket into 10-second intervals
+        df_vol["bucket"] = df_vol["timestamp"].dt.floor("10s")
+        vol_data = df_vol.groupby("bucket").size().reset_index(name="count")
+        fig_area = go.Figure()
+        fig_area.add_trace(go.Scatter(
+            x=vol_data["bucket"], y=vol_data["count"],
+            mode="lines", fill="tozeroy",
+            line=dict(color="#6366f1", width=2),
+            fillcolor="rgba(99,102,241,0.12)",
+            hovertemplate="Time: %{x|%H:%M:%S}<br>Events: %{y}<extra></extra>",
+            name="Traffic",
+        ))
+        fig_area.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            height=200, margin=dict(l=10,r=10,t=10,b=10),
+            xaxis=dict(gridcolor="#f1f5f9", tickfont=dict(size=10,color="#94a3b8"), title=None),
+            yaxis=dict(gridcolor="#f1f5f9", tickfont=dict(size=10,color="#94a3b8"), title=None, zeroline=False),
+            showlegend=False, hovermode="x unified",
+        )
+        st.plotly_chart(fig_area, use_container_width=True, config={"displayModeBar": False})
+    else:
+        st.info("Waiting for data…")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with col_export:
+    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+    st.markdown('<p class="section-header"><span class="dot" style="background:#22c55e"></span>Export Report</p>', unsafe_allow_html=True)
+    if history:
+        df_export = pd.DataFrame(history)
+        # CSV export
+        csv_data = df_export.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="⬇️ Download CSV",
+            data=csv_data,
+            file_name=f"threat_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+        st.markdown("<div style='margin-top:0.5rem'></div>", unsafe_allow_html=True)
+        # Summary text export
+        summary_lines = [
+            f"CyberThreat Intelligence Report",
+            f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"",
+            f"SUMMARY",
+            f"Total Events : {total}",
+            f"High Risk    : {high} ({high_pct}%)",
+            f"Avg Risk     : {avg_risk:.4f}",
+            f"Anomalies    : {anomaly}",
+            f"Threat Level : {gauge_label}",
+            f"Attacks/Min  : {attacks_per_min}",
+            f"Confidence   : {live_conf_pct}%",
+            f"",
+            f"ATTACK BREAKDOWN",
+        ]
+        for att, cnt in sorted(attack_counts.items(), key=lambda x: -x[1]):
+            summary_lines.append(f"  {att:<18}: {cnt}")
+        summary_txt = "\n".join(summary_lines).encode("utf-8")
+        st.download_button(
+            label="⬇️ Download Report (TXT)",
+            data=summary_txt,
+            file_name=f"threat_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+            mime="text/plain",
+            use_container_width=True,
+        )
+        st.markdown(f"""
+        <div style="margin-top:0.8rem;font-size:0.75rem;color:#94a3b8;text-align:center">
+            {len(df_export)} records ready
+        </div>""", unsafe_allow_html=True)
+    else:
+        st.info("No data to export yet.")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+st.markdown("<div style='margin-bottom:0.5rem'></div>", unsafe_allow_html=True)
+
 # ─── AUTO REFRESH ─────────────────────────────────────────────────────────────
 if auto_refresh:
     time.sleep(REFRESH_SECS)
-    st.rerun()  
+    st.rerun()
