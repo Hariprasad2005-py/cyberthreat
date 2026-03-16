@@ -209,74 +209,211 @@ section[data-testid="stSidebar"] hr { border-color:#1e293b !important; }
 .status-offline { color:#ef4444 !important; font-weight:600; font-size:0.82rem; }
 </style>
 
-<!-- THREE.JS NETWORK VISUALIZATION -->
-<canvas id="threejs-bg"></canvas>
+""", unsafe_allow_html=True)
+
+# ─── THREE.JS NETWORK — 5-second intro splash then auto-hides ────────────────
+components.html("""
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:transparent; overflow:hidden; font-family:'Inter',sans-serif; }
+
+#splash {
+    position: relative;
+    width: 100%;
+    height: 500px;
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 40%, #0f172a 100%);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: opacity 0.8s ease, height 0.8s ease;
+}
+
+#splash.hiding {
+    opacity: 0;
+    height: 0;
+}
+
+canvas { display:block; width:100% !important; height:100% !important; }
+
+#overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 10;
+}
+
+#title-text {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: white;
+    letter-spacing: -0.02em;
+    text-align: center;
+    opacity: 0;
+    transform: translateY(12px);
+    animation: fadeUp 0.8s ease 0.3s forwards;
+}
+
+#sub-text {
+    font-size: 0.78rem;
+    color: rgba(148,163,184,0.9);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-top: 0.5rem;
+    text-align: center;
+    opacity: 0;
+    animation: fadeUp 0.8s ease 0.6s forwards;
+}
+
+#countdown-ring {
+    margin-top: 1.4rem;
+    position: relative;
+    width: 52px;
+    height: 52px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease 0.9s forwards;
+}
+
+#countdown-ring svg {
+    transform: rotate(-90deg);
+}
+
+#countdown-num {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #60a5fa;
+}
+
+#ring-fill {
+    stroke-dasharray: 138;
+    stroke-dashoffset: 0;
+    animation: drainRing 5s linear 1s forwards;
+}
+
+@keyframes drainRing {
+    from { stroke-dashoffset: 0; }
+    to   { stroke-dashoffset: 138; }
+}
+
+@keyframes fadeUp {
+    to { opacity:1; transform:translateY(0); }
+}
+
+#node-labels {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 5;
+}
+</style>
+</head>
+<body>
+<div id="splash">
+    <canvas id="c"></canvas>
+    <div id="overlay">
+        <div id="title-text">🛡️ CyberThreat Network Topology</div>
+        <div id="sub-text">Live AI-Powered Threat Detection · Random Forest + Isolation Forest</div>
+        <div id="countdown-ring">
+            <svg width="52" height="52" viewBox="0 0 52 52">
+                <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(99,102,241,0.25)" stroke-width="3"/>
+                <circle id="ring-fill" cx="26" cy="26" r="22" fill="none"
+                        stroke="#6366f1" stroke-width="3"
+                        stroke-linecap="round"/>
+            </svg>
+            <div id="countdown-num">5</div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
+// ── Countdown number ──
+var num = document.getElementById('countdown-num');
+var counts = [5,4,3,2,1];
+counts.forEach(function(n, i) {
+    setTimeout(function() { if(num) num.textContent = n; }, i * 1000 + 1000);
+});
+
+// ── Hide splash after 5.8s ──
+setTimeout(function() {
+    var splash = document.getElementById('splash');
+    if (splash) splash.classList.add('hiding');
+}, 5800);
+
+// ── Three.js ──
 (function() {
-    var canvas = document.getElementById('threejs-bg');
-    if (!canvas) return;
+    var canvas = document.getElementById('c');
+    var W = canvas.parentElement.offsetWidth || 800;
+    var H = 500;
 
     var renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(W, H);
     renderer.setClearColor(0x000000, 0);
 
-    var scene = new THREE.Scene();
-    var camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.z = 80;
+    var scene  = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(60, W / H, 0.1, 1000);
+    camera.position.z = 75;
 
-    /* ── Nodes (network packets / IP addresses) ── */
-    var nodeCount = 90;
+    // Nodes
+    var nodeCount = 70;
     var nodes = [];
-    var nodeGeom = new THREE.SphereGeometry(0.45, 8, 8);
-
-    var colors = [0x6366f1, 0x3b82f6, 0x60a5fa, 0x93c5fd, 0x1d4ed8];
+    var nodeGeom = new THREE.SphereGeometry(0.5, 10, 10);
+    var colors = [0x6366f1, 0x3b82f6, 0x60a5fa, 0x93c5fd, 0xef4444, 0xf59e0b];
 
     for (var i = 0; i < nodeCount; i++) {
+        var isAttack = Math.random() > 0.75;
         var mat = new THREE.MeshBasicMaterial({
-            color: colors[Math.floor(Math.random() * colors.length)],
+            color: isAttack ? colors[4] : colors[Math.floor(Math.random() * 4)],
             transparent: true,
-            opacity: Math.random() * 0.5 + 0.2
+            opacity: isAttack ? 0.9 : (Math.random() * 0.4 + 0.3)
         });
         var mesh = new THREE.Mesh(nodeGeom, mat);
         mesh.position.set(
-            (Math.random() - 0.5) * 180,
-            (Math.random() - 0.5) * 100,
-            (Math.random() - 0.5) * 60
+            (Math.random() - 0.5) * 160,
+            (Math.random() - 0.5) * 80,
+            (Math.random() - 0.5) * 50
         );
         mesh.userData = {
-            vx: (Math.random() - 0.5) * 0.06,
-            vy: (Math.random() - 0.5) * 0.04,
-            vz: (Math.random() - 0.5) * 0.03,
-            pulseSpeed: Math.random() * 0.02 + 0.005,
-            pulseOffset: Math.random() * Math.PI * 2
+            vx: (Math.random() - 0.5) * 0.05,
+            vy: (Math.random() - 0.5) * 0.035,
+            vz: (Math.random() - 0.5) * 0.025,
+            pulseSpeed: Math.random() * 0.025 + 0.008,
+            pulseOffset: Math.random() * Math.PI * 2,
+            isAttack: isAttack
         };
         scene.add(mesh);
         nodes.push(mesh);
     }
 
-    /* ── Edges (connections between nodes) ── */
-    var edgeMaterial = new THREE.LineBasicMaterial({
-        color: 0x6366f1,
-        transparent: true,
-        opacity: 0.12
-    });
-
+    // Edges
     var edgeLines = [];
-    var connectionDist = 38;
+    var connDist = 35;
 
     function rebuildEdges() {
-        edgeLines.forEach(function(l) { scene.remove(l); });
+        edgeLines.forEach(function(l) { scene.remove(l); l.geometry.dispose(); l.material.dispose(); });
         edgeLines = [];
         for (var i = 0; i < nodes.length; i++) {
             for (var j = i + 1; j < nodes.length; j++) {
                 var d = nodes[i].position.distanceTo(nodes[j].position);
-                if (d < connectionDist) {
-                    var points = [nodes[i].position.clone(), nodes[j].position.clone()];
-                    var geom = new THREE.BufferGeometry().setFromPoints(points);
-                    var line = new THREE.Line(geom, edgeMaterial.clone());
-                    line.material.opacity = (1 - d / connectionDist) * 0.18;
+                if (d < connDist) {
+                    var isHot = nodes[i].userData.isAttack || nodes[j].userData.isAttack;
+                    var pts  = [nodes[i].position.clone(), nodes[j].position.clone()];
+                    var geom = new THREE.BufferGeometry().setFromPoints(pts);
+                    var lmat = new THREE.LineBasicMaterial({
+                        color: isHot ? 0xef4444 : 0x6366f1,
+                        transparent: true,
+                        opacity: isHot ? (1 - d/connDist) * 0.35 : (1 - d/connDist) * 0.15
+                    });
+                    var line = new THREE.Line(geom, lmat);
                     scene.add(line);
                     edgeLines.push(line);
                 }
@@ -284,77 +421,78 @@ section[data-testid="stSidebar"] hr { border-color:#1e293b !important; }
         }
     }
 
-    /* ── Animated data packets travelling along edges ── */
-    var packetGeom = new THREE.SphereGeometry(0.25, 6, 6);
-    var packetMat  = new THREE.MeshBasicMaterial({ color: 0xef4444, transparent:true, opacity:0.9 });
+    // Packets
+    var packetGeom = new THREE.SphereGeometry(0.3, 8, 8);
     var packets = [];
 
     function spawnPacket() {
         var a = Math.floor(Math.random() * nodes.length);
         var b = Math.floor(Math.random() * nodes.length);
         if (a === b) return;
-        var mesh = new THREE.Mesh(packetGeom, packetMat.clone());
-        mesh.material.color.setHex(Math.random() > 0.6 ? 0xef4444 : 0x6366f1);
-        scene.add(mesh);
-        packets.push({ mesh: mesh, from: nodes[a].position, to: nodes[b].position, t: 0, speed: 0.012 + Math.random()*0.012 });
+        var isAttackPkt = nodes[a].userData.isAttack || nodes[b].userData.isAttack;
+        var m = new THREE.Mesh(packetGeom, new THREE.MeshBasicMaterial({
+            color: isAttackPkt ? 0xef4444 : 0x60a5fa,
+            transparent: true, opacity: 0.95
+        }));
+        scene.add(m);
+        packets.push({
+            mesh: m,
+            from: nodes[a].position.clone(),
+            to: nodes[b].position.clone(),
+            t: 0,
+            speed: 0.015 + Math.random() * 0.015
+        });
     }
-
-    for (var p = 0; p < 12; p++) spawnPacket();
+    for (var p = 0; p < 15; p++) spawnPacket();
 
     var clock = new THREE.Clock();
-    var frameCount = 0;
+    var frame = 0;
 
     function animate() {
         requestAnimationFrame(animate);
         var t = clock.getElapsedTime();
-        frameCount++;
+        frame++;
 
-        /* Pulse nodes */
         nodes.forEach(function(n) {
-            var s = 1 + 0.25 * Math.sin(t * n.userData.pulseSpeed * 60 + n.userData.pulseOffset);
+            var s = 1 + 0.3 * Math.sin(t * n.userData.pulseSpeed * 60 + n.userData.pulseOffset);
             n.scale.setScalar(s);
             n.position.x += n.userData.vx;
             n.position.y += n.userData.vy;
             n.position.z += n.userData.vz;
-            if (Math.abs(n.position.x) > 90) n.userData.vx *= -1;
-            if (Math.abs(n.position.y) > 50) n.userData.vy *= -1;
-            if (Math.abs(n.position.z) > 30) n.userData.vz *= -1;
+            if (Math.abs(n.position.x) > 80)  n.userData.vx *= -1;
+            if (Math.abs(n.position.y) > 40)  n.userData.vy *= -1;
+            if (Math.abs(n.position.z) > 25)  n.userData.vz *= -1;
         });
 
-        /* Rebuild edges every 40 frames */
-        if (frameCount % 40 === 0) rebuildEdges();
+        if (frame % 45 === 0) rebuildEdges();
 
-        /* Move packets */
-        packets.forEach(function(pk, idx) {
+        for (var i = packets.length - 1; i >= 0; i--) {
+            var pk = packets[i];
             pk.t += pk.speed;
             if (pk.t >= 1) {
                 scene.remove(pk.mesh);
-                packets.splice(idx, 1);
+                pk.mesh.geometry.dispose();
+                pk.mesh.material.dispose();
+                packets.splice(i, 1);
                 spawnPacket();
-                return;
+            } else {
+                pk.mesh.position.lerpVectors(pk.from, pk.to, pk.t);
             }
-            pk.mesh.position.lerpVectors(pk.from, pk.to, pk.t);
-        });
+        }
 
-        /* Slow camera drift */
-        camera.position.x = Math.sin(t * 0.04) * 8;
-        camera.position.y = Math.cos(t * 0.03) * 4;
+        camera.position.x = Math.sin(t * 0.05) * 10;
+        camera.position.y = Math.cos(t * 0.04) * 5;
         camera.lookAt(scene.position);
-
         renderer.render(scene, camera);
     }
 
     rebuildEdges();
     animate();
-
-    window.addEventListener('resize', function() {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
 })();
 </script>
-""", unsafe_allow_html=True)
+</body>
+</html>
+""", height=520, scrolling=False)
 
 # ─── SESSION STATE ────────────────────────────────────────────────────────────
 for k, v in [("alerted_ids", set()), ("alert_log", []), ("sound_enabled", True)]:
