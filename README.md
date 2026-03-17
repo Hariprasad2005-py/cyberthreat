@@ -6,7 +6,7 @@ Place CSV files in archive/ folder and rename to dataset.csv
 
 > **Hackathon Problem:** PS-AIML-02 — AI-Driven Cyber Threat Detection and Network Anomaly Intelligence System
 
-**Live Dashboard:** https://cyberthreat-dashboard.onrender.com
+**Live Dashboard:** https://hariprasad2005-py.github.io/cyberthreat/
 **Live API:** https://cyberthreat-api.onrender.com
 
 ---
