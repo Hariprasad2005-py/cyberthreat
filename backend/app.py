@@ -327,7 +327,11 @@ def unblock_ip():
         blocked_ips.remove(ip)
         save_blocked_ips(blocked_ips)
     return jsonify({"status": "unblocked", "ip": ip, "total_blocked": len(blocked_ips)}), 200
-
+@app.route("/reset", methods=["POST"])
+def reset():
+    global prediction_history
+    prediction_history = []
+    return jsonify({"status": "reset"}), 200
 # ─── MAIN ─────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     print("=" * 50)
