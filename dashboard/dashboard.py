@@ -18,7 +18,7 @@ from datetime import datetime
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
 API_BASE      = "http://localhost:5000"
 REMOTE_API    = "https://cyberthreat-api.onrender.com"
-REFRESH_SECS  = 10
+REFRESH_SECS  = 2
 HISTORY_LIMIT = 100
 
 def get_api_base():
@@ -457,15 +457,14 @@ with nav_placeholder:
         """, unsafe_allow_html=True)
     with n_right:
         btn_col1, btn_col2 = st.columns(2)
-        with btn_col1:
-            # Dark mode toggle
+       with btn_col1:
             toggle_label = "☀️ Light" if dark else "🌙 Dark"
             if st.button(toggle_label, key="dark_toggle", use_container_width=True):
                 st.session_state.dark_mode = not st.session_state.dark_mode
                 st.session_state.reset_status = None
+                time.sleep(1)
                 st.rerun()
         with btn_col2:
-            # Reset button — FIXED: only sets status, rerun handles display
             if st.button("🔄 Reset", key="reset_btn", use_container_width=True):
                 try:
                     r = requests.post(f"{API_URL}/reset", timeout=5)
@@ -475,6 +474,7 @@ with nav_placeholder:
                         st.session_state.reset_status = "fail"
                 except Exception:
                     st.session_state.reset_status = "fail"
+                time.sleep(1)
                 st.rerun()
 
 # ─── NOTIFICATION BANNER (mutually exclusive) ──────────────────────────────────
@@ -662,7 +662,7 @@ setTimeout(function() {
 </body>
 </html>
         """, height=520, scrolling=False)
-    time.sleep(6)
+    time.sleep(0)
     _splash.empty()
     st.session_state.splash_shown = True
 
