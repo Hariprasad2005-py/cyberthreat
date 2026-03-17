@@ -457,7 +457,7 @@ with nav_placeholder:
         """, unsafe_allow_html=True)
     with n_right:
         btn_col1, btn_col2 = st.columns(2)
-       with btn_col1:
+        with btn_col1:
             toggle_label = "☀️ Light" if dark else "🌙 Dark"
             if st.button(toggle_label, key="dark_toggle", use_container_width=True):
                 st.session_state.dark_mode = not st.session_state.dark_mode
