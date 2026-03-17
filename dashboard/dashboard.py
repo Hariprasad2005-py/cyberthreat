@@ -18,14 +18,12 @@ from datetime import datetime
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
 API_BASE      = "http://localhost:5000"
 REMOTE_API    = "https://cyberthreat-api.onrender.com"
-REFRESH_SECS  = 2
+REFRESH_SECS  = 10
 HISTORY_LIMIT = 100
 
-@st.cache_data(ttl=3600)
 def get_api_base():
     try:
-        # Fast check for local API
-        r = requests.get(f"{API_BASE}/health", timeout=0.5)
+        r = requests.get(f"{API_BASE}/health", timeout=1)
         if r.status_code == 200:
             return API_BASE
     except:
@@ -589,7 +587,7 @@ var num = document.getElementById('countdown-num');
 setTimeout(function() {
     var splash = document.getElementById('splash');
     if (splash) splash.classList.add('hiding');
-}, 800);
+}, 5800);
 (function() {
     var canvas = document.getElementById('c');
     var W = canvas.parentElement.offsetWidth || 800, H = 500;
@@ -664,7 +662,7 @@ setTimeout(function() {
 </body>
 </html>
         """, height=520, scrolling=False)
-    # No artificial sleep here anymore for speed
+    time.sleep(6)
     _splash.empty()
     st.session_state.splash_shown = True
 
