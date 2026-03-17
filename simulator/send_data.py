@@ -22,9 +22,20 @@ import pandas as pd
 import os
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
-API_BASE     = "https://cyberthreat-api.onrender.com"
-API_URL      = f"{API_BASE}/predict"
-DATASET_PATH = "archive/dataset.csv"
+LOCAL_API    = "http://localhost:5000"
+REMOTE_API   = "https://cyberthreat-api.onrender.com"
+
+def get_api_url():
+    try:
+        r = requests.get(f"{LOCAL_API}/health", timeout=1)
+        if r.status_code == 200:
+            return f"{LOCAL_API}/predict"
+    except:
+        pass
+    return f"{REMOTE_API}/predict"
+
+API_URL      = get_api_url()
+DATASET_PATH = "archive/clean_dataset.csv"
 
 IP_POOLS = {
     "Other"  : [f"10.0.0.{i}"     for i in range(1, 50)],

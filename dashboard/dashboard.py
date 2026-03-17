@@ -14,9 +14,23 @@ import streamlit.components.v1 as components
 from datetime import datetime
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
-API_BASE      = "https://cyberthreat-api.onrender.com"
-REFRESH_SECS  = 3
+# Use local API if possible, otherwise fallback to remote
+API_BASE      = "http://localhost:5000"
+REMOTE_API    = "https://cyberthreat-api.onrender.com"
+REFRESH_SECS  = 10
 HISTORY_LIMIT = 100
+
+def get_api_base():
+    try:
+        # Check if local API is alive
+        r = requests.get(f"{API_BASE}/health", timeout=1)
+        if r.status_code == 200:
+            return API_BASE
+    except:
+        pass
+    return REMOTE_API
+
+API_URL = get_api_base()
 
 ATTACK_COLORS = {
     "Normal Traffic": "#22c55e",
@@ -45,6 +59,7 @@ IP_GEO_MAP = {
     "203.113": (13.75,  100.52, "Bangkok"),
 }
 
+@st.cache_data
 def ip_to_geo(ip):
     prefix2 = ".".join(ip.split(".")[:2])
     if prefix2 in IP_GEO_MAP:
@@ -211,12 +226,14 @@ section[data-testid="stSidebar"] hr { border-color:#1e293b !important; }
 
 """, unsafe_allow_html=True)
 
-# ─── THREE.JS NETWORK — 5-second intro splash then auto-hides ────────────────
-_splash = st.empty()
-_splash.components_html = None
+# ─── THREE.JS NETWORK — Run once per session ──────────────────────────────────
+if "splash_shown" not in st.session_state:
+    st.session_state.splash_shown = False
 
-with _splash.container():
-    components.html("""
+if not st.session_state.splash_shown:
+    _splash = st.empty()
+    with _splash.container():
+        components.html("""
 <!DOCTYPE html>
 <html>
 <head>
@@ -499,10 +516,10 @@ setTimeout(function() {
 </script>
 </body>
 </html>
-    """, height=520, scrolling=False)
-
-time.sleep(0)
-_splash.empty()
+        """, height=520, scrolling=False)
+    time.sleep(6)
+    _splash.empty()
+    st.session_state.splash_shown = True
 
 # ─── SESSION STATE ────────────────────────────────────────────────────────────
 for k, v in [("alerted_ids", set()), ("alert_log", []), ("sound_enabled", True)]:
@@ -524,7 +541,7 @@ try {
 # ─── API HELPERS ──────────────────────────────────────────────────────────────
 def fetch(endpoint, timeout=10):
     try:
-        r = requests.get(f"{API_BASE}/{endpoint}", timeout=timeout)
+        r = requests.get(f"{API_URL}/{endpoint}", timeout=timeout)
         if r.status_code == 200:
             return r.json()
     except:
@@ -533,7 +550,7 @@ def fetch(endpoint, timeout=10):
 
 def post_api(endpoint, payload):
     try:
-        requests.post(f"{API_BASE}/{endpoint}", json=payload, timeout=5)
+        requests.post(f"{API_URL}/{endpoint}", json=payload, timeout=5)
     except:
         pass
 
