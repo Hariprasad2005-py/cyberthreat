@@ -622,10 +622,12 @@ with col_time:
             <div style="font-size:1.05rem;font-weight:700;color:#334155;font-family:'JetBrains Mono',monospace">{datetime.now().strftime('%H:%M:%S')}</div>
             <div style="font-size:0.86rem;color:#94a3b8">{datetime.now().strftime('%d %b %Y')}</div>
         </div>""", unsafe_allow_html=True)
-    if st.button("🔄 Reset Stats", use_container_width=True):
-        requests.post(f"{API_BASE}/reset", timeout=5)
-        st.rerun()
-
+if st.button("🔄 Reset Stats", use_container_width=True):
+    try:
+        requests.post("https://cyberthreat-api.onrender.com/reset", timeout=5)
+    except:
+        pass
+    st.rerun()
 st.markdown("<div style='margin-bottom:1.2rem'></div>", unsafe_allow_html=True)
 
 # ─── KPI CARDS ────────────────────────────────────────────────────────────────
