@@ -1,6 +1,8 @@
 """
 CyberThreat AI Dashboard — Hackathon Edition
-Clean, impressive light theme with advanced visualizations
+Clean, impressive light/dark theme with advanced visualizations
+FIXED: Reset button shows only success OR failure (not both)
+FIXED: Full-width navbar with bold letters and dark mode toggle
 """
 
 import time
@@ -14,7 +16,6 @@ import streamlit.components.v1 as components
 from datetime import datetime
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
-# Use local API if possible, otherwise fallback to remote
 API_BASE      = "http://localhost:5000"
 REMOTE_API    = "https://cyberthreat-api.onrender.com"
 REFRESH_SECS  = 10
@@ -22,7 +23,6 @@ HISTORY_LIMIT = 100
 
 def get_api_base():
     try:
-        # Check if local API is alive
         r = requests.get(f"{API_BASE}/health", timeout=1)
         if r.status_code == 200:
             return API_BASE
@@ -45,7 +45,6 @@ ATTACK_COLORS = {
     "Heartbleed"    : "#7c3aed",
 }
 
-# IP prefix → approximate geo coordinates for threat map
 IP_GEO_MAP = {
     "203.0"  : (35.68,  139.69, "Tokyo"),
     "198.51" : (55.75,  37.62,  "Moscow"),
@@ -78,209 +77,438 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ─── THREE.JS NETWORK BACKGROUND ──────────────────────────────────────────────
-st.markdown("""
+# ─── SESSION STATE INIT ───────────────────────────────────────────────────────
+for k, v in [
+    ("alerted_ids", set()),
+    ("alert_log", []),
+    ("sound_enabled", True),
+    ("dark_mode", False),
+    ("splash_shown", False),
+    ("reset_status", None),   # None | "success" | "fail"
+]:
+    if k not in st.session_state:
+        st.session_state[k] = v
+
+# ─── DARK MODE VARS ───────────────────────────────────────────────────────────
+dark = st.session_state.dark_mode
+
+if dark:
+    BG_GRADIENT   = "linear-gradient(135deg, #0a0f1e 0%, #0f172a 40%, #0d1117 100%)"
+    CARD_BG       = "rgba(15,23,42,0.92)"
+    CARD_BORDER   = "rgba(99,102,241,0.18)"
+    TEXT_PRIMARY  = "#f1f5f9"
+    TEXT_SECONDARY= "#94a3b8"
+    TEXT_MUTED    = "#64748b"
+    PLOT_PAPER    = "rgba(0,0,0,0)"
+    PLOT_GRID     = "#1e293b"
+    TICK_COLOR    = "#64748b"
+    SIDEBAR_BG    = "rgba(7,10,20,0.99)"
+    NAVBAR_BG     = "rgba(10,15,30,0.95)"
+    NAVBAR_BORDER = "rgba(99,102,241,0.25)"
+    IP_BADGE_BG   = "rgba(30,41,59,0.9)"
+    IP_BADGE_BORDER= "#334155"
+    IP_BADGE_COLOR = "#cbd5e1"
+    ROW_BORDER    = "#1e293b"
+    MODEL_STAT_BG = "rgba(15,23,42,0.9)"
+    MODEL_STAT_BORDER="#1e293b"
+    EXPORT_BG     = "rgba(15,23,42,0.9)"
+    INFO_BG       = "rgba(30,41,59,0.8)"
+    SUMMARY_BG    = "rgba(15,23,42,0.9)"
+    SUMMARY_BORDER= "#1e293b"
+    TOGGLE_LABEL  = "☀️ Light Mode"
+    TOGGLE_BG     = "rgba(99,102,241,0.15)"
+    TOGGLE_BORDER = "#6366f1"
+    BODY_EXTRA    = """
+        [data-testid="stAppViewContainer"] { background: #0a0f1e !important; }
+        [data-testid="stAppViewContainer"]::before {
+            background:
+                radial-gradient(ellipse at 15% 20%, rgba(99,102,241,0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 85% 80%, rgba(59,130,246,0.12) 0%, transparent 50%) !important;
+        }
+        .stApp { background: #0a0f1e !important; }
+    """
+else:
+    BG_GRADIENT   = "linear-gradient(135deg, #f0f7ff 0%, #e8f4fd 20%, #ffffff 45%, #f0f9ff 70%, #dbeafe 100%)"
+    CARD_BG       = "rgba(255,255,255,0.85)"
+    CARD_BORDER   = "rgba(255,255,255,0.9)"
+    TEXT_PRIMARY  = "#0f172a"
+    TEXT_SECONDARY= "#334155"
+    TEXT_MUTED    = "#94a3b8"
+    PLOT_PAPER    = "rgba(0,0,0,0)"
+    PLOT_GRID     = "#f1f5f9"
+    TICK_COLOR    = "#94a3b8"
+    SIDEBAR_BG    = "rgba(15,23,42,0.97)"
+    NAVBAR_BG     = "rgba(255,255,255,0.88)"
+    NAVBAR_BORDER = "rgba(255,255,255,0.5)"
+    IP_BADGE_BG   = "rgba(248,250,252,0.9)"
+    IP_BADGE_BORDER= "#e2e8f0"
+    IP_BADGE_COLOR = "#334155"
+    ROW_BORDER    = "rgba(241,245,249,0.8)"
+    MODEL_STAT_BG = "rgba(248,250,252,0.9)"
+    MODEL_STAT_BORDER="#e2e8f0"
+    EXPORT_BG     = "#f8fafc"
+    INFO_BG       = "#f8fafc"
+    SUMMARY_BG    = "#f8fafc"
+    SUMMARY_BORDER= "#e2e8f0"
+    TOGGLE_LABEL  = "🌙 Dark Mode"
+    TOGGLE_BG     = "rgba(99,102,241,0.08)"
+    TOGGLE_BORDER = "#6366f1"
+    BODY_EXTRA    = ""
+
+# ─── GLOBAL CSS ───────────────────────────────────────────────────────────────
+st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+html, body, [class*="css"] {{
+    font-family: 'Inter', sans-serif;
+}}
 
-/* ── Gradient background ── */
-[data-testid="stAppViewContainer"] {
-    background: linear-gradient(135deg,
-        #f0f7ff 0%,
-        #e8f4fd 20%,
-        #ffffff 45%,
-        #f0f9ff 70%,
-        #dbeafe 100%
-    ) !important;
+[data-testid="stAppViewContainer"] {{
+    background: {BG_GRADIENT} !important;
     background-attachment: fixed !important;
-}
-[data-testid="stAppViewContainer"]::before {
+}}
+[data-testid="stAppViewContainer"]::before {{
     content: '';
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
     background:
         radial-gradient(ellipse at 15% 20%, rgba(99,102,241,0.08) 0%, transparent 50%),
         radial-gradient(ellipse at 85% 80%, rgba(59,130,246,0.10) 0%, transparent 50%),
-        radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.6) 0%, transparent 70%);
+        radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.3) 0%, transparent 70%);
     pointer-events: none;
     z-index: 0;
-}
+}}
 
-/* Three.js canvas fixed behind everything */
-#threejs-bg {
-    position: fixed !important;
-    top: 0; left: 0;
-    width: 100vw; height: 100vh;
-    z-index: 0;
-    pointer-events: none;
-    opacity: 0.55;
-}
+{BODY_EXTRA}
 
-/* Ensure content sits above canvas */
-[data-testid="stAppViewContainer"] > div {
+.main .block-container {{
+    padding: 0 2rem 2rem 2rem;
+    max-width: 100%;
     position: relative;
     z-index: 1;
-}
-section[data-testid="stSidebar"] {
-    z-index: 100 !important;
-}
+}}
 
-.main .block-container { padding: 1.5rem 2rem 2rem 2rem; max-width: 1400px; position:relative; z-index:1; }
-#MainMenu, footer, header { visibility: hidden; }
+#MainMenu, footer, header {{ visibility: hidden; }}
 
-/* ── KPI Cards — glass morphism ── */
-.kpi-card {
-    background: rgba(255,255,255,0.85);
+/* ── NAVBAR ── */
+.navbar-outer {{
+    position: sticky;
+    top: 0;
+    z-index: 9999;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}}
+.navbar {{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.85rem 2.5rem;
+    background: {NAVBAR_BG};
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1.5px solid {NAVBAR_BORDER};
+    box-shadow: 0 4px 30px rgba(0,0,0,0.08);
+    width: 100%;
+    box-sizing: border-box;
+}}
+.nav-logo {{
+    font-family: 'Syne', sans-serif;
+    font-size: 1.55rem;
+    font-weight: 900;
+    color: {TEXT_PRIMARY};
+    letter-spacing: -0.03em;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    text-transform: uppercase;
+}}
+.nav-logo .logo-accent {{
+    color: #6366f1;
+    font-weight: 900;
+}}
+.nav-logo .logo-shield {{
+    font-size: 1.6rem;
+    filter: drop-shadow(0 0 8px rgba(99,102,241,0.5));
+}}
+.nav-right {{
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}}
+.nav-time {{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: {TEXT_MUTED};
+    letter-spacing: 0.05em;
+}}
+.dark-toggle-btn {{
+    background: {TOGGLE_BG};
+    border: 1.5px solid {TOGGLE_BORDER};
+    border-radius: 99px;
+    padding: 0.42rem 1.1rem;
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: #6366f1;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: 0.02em;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}}
+.dark-toggle-btn:hover {{
+    background: rgba(99,102,241,0.2);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(99,102,241,0.25);
+}}
+
+/* ── KPI Cards ── */
+.kpi-card {{
+    background: {CARD_BG};
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-radius: 16px;
     padding: 1.4rem 1.6rem;
     box-shadow: 0 2px 8px rgba(99,102,241,0.08), 0 4px 24px rgba(59,130,246,0.06);
-    border: 1px solid rgba(255,255,255,0.9);
+    border: 1px solid {CARD_BORDER};
     position: relative; overflow: hidden;
     transition: transform 0.2s, box-shadow 0.2s;
-}
-.kpi-card:hover {
+}}
+.kpi-card:hover {{
     transform: translateY(-2px);
-    box-shadow: 0 8px 32px rgba(99,102,241,0.14);
-    background: rgba(255,255,255,0.95);
-}
-.kpi-card::before {
+    box-shadow: 0 8px 32px rgba(99,102,241,0.18);
+}}
+.kpi-card::before {{
     content:''; position:absolute; top:0; left:0; right:0; height:3px; border-radius:16px 16px 0 0;
-}
-.kpi-card.blue::before   { background: linear-gradient(90deg,#6366f1,#818cf8); }
-.kpi-card.red::before    { background: linear-gradient(90deg,#ef4444,#f87171); }
-.kpi-card.amber::before  { background: linear-gradient(90deg,#f59e0b,#fbbf24); }
-.kpi-card.green::before  { background: linear-gradient(90deg,#22c55e,#4ade80); }
-.kpi-card.purple::before { background: linear-gradient(90deg,#8b5cf6,#a78bfa); }
+}}
+.kpi-card.blue::before   {{ background: linear-gradient(90deg,#6366f1,#818cf8); }}
+.kpi-card.red::before    {{ background: linear-gradient(90deg,#ef4444,#f87171); }}
+.kpi-card.amber::before  {{ background: linear-gradient(90deg,#f59e0b,#fbbf24); }}
+.kpi-card.green::before  {{ background: linear-gradient(90deg,#22c55e,#4ade80); }}
+.kpi-card.purple::before {{ background: linear-gradient(90deg,#8b5cf6,#a78bfa); }}
 
-.kpi-label { font-size:0.82rem; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:#94a3b8; margin-bottom:0.4rem; }
-.kpi-value { font-size:2.3rem; font-weight:800; color:#0f172a; line-height:1.1; font-variant-numeric:tabular-nums; }
-.kpi-value.red    { color:#ef4444; }
-.kpi-value.amber  { color:#f59e0b; }
-.kpi-value.green  { color:#22c55e; }
-.kpi-value.blue   { color:#6366f1; }
-.kpi-value.purple { color:#8b5cf6; }
-.kpi-sub { font-size:0.85rem; color:#94a3b8; margin-top:0.3rem; }
+.kpi-label {{ font-size:0.82rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:{TEXT_MUTED}; margin-bottom:0.4rem; }}
+.kpi-value {{ font-size:2.3rem; font-weight:800; color:{TEXT_PRIMARY}; line-height:1.1; font-variant-numeric:tabular-nums; }}
+.kpi-value.red    {{ color:#ef4444; }}
+.kpi-value.amber  {{ color:#f59e0b; }}
+.kpi-value.green  {{ color:#22c55e; }}
+.kpi-value.blue   {{ color:#6366f1; }}
+.kpi-value.purple {{ color:#8b5cf6; }}
+.kpi-sub {{ font-size:0.85rem; color:{TEXT_MUTED}; margin-top:0.3rem; }}
 
-.section-header {
-    font-size:1.1rem; font-weight:700; color:#0f172a;
+/* ── Section headers ── */
+.section-header {{
+    font-family: 'Syne', sans-serif;
+    font-size:1.05rem; font-weight:800; color:{TEXT_PRIMARY};
     letter-spacing:-0.01em; margin:0 0 1rem 0;
     display:flex; align-items:center; gap:0.5rem;
-}
-.section-header .dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+}}
+.section-header .dot {{ width:8px; height:8px; border-radius:50%; display:inline-block; }}
 
-/* ── Chart cards — glass morphism ── */
-.chart-card {
-    background: rgba(255,255,255,0.82);
+/* ── Chart cards ── */
+.chart-card {{
+    background: {CARD_BG};
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     border-radius: 16px; padding: 1.4rem 1.6rem;
     box-shadow: 0 2px 8px rgba(99,102,241,0.07), 0 4px 20px rgba(59,130,246,0.05);
-    border: 1px solid rgba(255,255,255,0.88);
+    border: 1px solid {CARD_BORDER};
     margin-bottom: 1rem;
-}
+}}
 
-.alert-row {
+/* ── Alert rows ── */
+.alert-row {{
     display:flex; align-items:center; justify-content:space-between;
     padding:0.6rem 0.9rem; border-radius:10px; margin-bottom:0.45rem;
     font-size:0.9rem; font-weight:500;
-}
-.alert-high   { background:rgba(255,241,242,0.9); border-left:3px solid #ef4444; }
-.alert-medium { background:rgba(255,251,235,0.9); border-left:3px solid #f59e0b; }
-.alert-low    { background:rgba(240,253,244,0.9); border-left:3px solid #22c55e; }
-.alert-tag { font-size:0.78rem; font-weight:700; padding:2px 7px; border-radius:99px; letter-spacing:0.05em; }
-.tag-high   { background:#fee2e2; color:#ef4444; }
-.tag-medium { background:#fef3c7; color:#d97706; }
-.tag-low    { background:#dcfce7; color:#16a34a; }
+}}
+.alert-high   {{ background:{"rgba(60,10,10,0.6)" if dark else "rgba(255,241,242,0.9)"}; border-left:3px solid #ef4444; }}
+.alert-medium {{ background:{"rgba(60,40,5,0.6)" if dark else "rgba(255,251,235,0.9)"}; border-left:3px solid #f59e0b; }}
+.alert-low    {{ background:{"rgba(5,40,15,0.6)" if dark else "rgba(240,253,244,0.9)"}; border-left:3px solid #22c55e; }}
+.alert-tag {{ font-size:0.78rem; font-weight:700; padding:2px 7px; border-radius:99px; letter-spacing:0.05em; }}
+.tag-high   {{ background:#fee2e2; color:#ef4444; }}
+.tag-medium {{ background:#fef3c7; color:#d97706; }}
+.tag-low    {{ background:#dcfce7; color:#16a34a; }}
 
-.ip-row {
+/* ── IP rows ── */
+.ip-row {{
     display:flex; justify-content:space-between; align-items:center;
-    padding:0.5rem 0; border-bottom:1px solid rgba(241,245,249,0.8); font-size:0.9rem;
-}
-.ip-badge {
+    padding:0.5rem 0; border-bottom:1px solid {ROW_BORDER}; font-size:0.9rem;
+    color: {TEXT_PRIMARY};
+}}
+.ip-badge {{
     font-family:'JetBrains Mono',monospace; font-size:0.86rem;
-    background:rgba(248,250,252,0.9); border:1px solid #e2e8f0;
-    padding:2px 7px; border-radius:6px; color:#334155;
-}
-.count-badge { background:#ef4444; color:white; font-size:0.78rem; font-weight:700; padding:2px 7px; border-radius:99px; }
+    background:{IP_BADGE_BG}; border:1px solid {IP_BADGE_BORDER};
+    padding:2px 7px; border-radius:6px; color:{IP_BADGE_COLOR};
+}}
+.count-badge {{ background:#ef4444; color:white; font-size:0.78rem; font-weight:700; padding:2px 7px; border-radius:99px; }}
 
-.model-stat { text-align:center; padding:0.9rem; background:rgba(248,250,252,0.9); border-radius:12px; border:1px solid #e2e8f0; }
-.model-stat-val { font-size:1.6rem; font-weight:800; color:#6366f1; }
-.model-stat-lbl { font-size:0.8rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#94a3b8; margin-top:0.2rem; }
+/* ── Model stats ── */
+.model-stat {{ text-align:center; padding:0.9rem; background:{MODEL_STAT_BG}; border-radius:12px; border:1px solid {MODEL_STAT_BORDER}; }}
+.model-stat-val {{ font-size:1.6rem; font-weight:800; color:#6366f1; }}
+.model-stat-lbl {{ font-size:0.8rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:{TEXT_MUTED}; margin-top:0.2rem; }}
 
-.page-title    { font-size:1.85rem; font-weight:800; color:#0f172a; letter-spacing:-0.03em; margin-bottom:0; }
-.page-subtitle { font-size:0.93rem; color:#64748b; margin-top:0.2rem; }
+/* ── Page title ── */
+.page-title    {{ font-family:'Syne',sans-serif; font-size:1.85rem; font-weight:900; color:{TEXT_PRIMARY}; letter-spacing:-0.03em; margin-bottom:0; text-transform:uppercase; }}
+.page-subtitle {{ font-size:0.93rem; color:{TEXT_MUTED}; margin-top:0.2rem; }}
 
-@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(1.4)} }
-.pulse-dot { width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;animation:pulse 1.8s infinite;margin-right:5px; }
+@keyframes pulse {{ 0%,100%{{opacity:1;transform:scale(1)}} 50%{{opacity:0.4;transform:scale(1.4)}} }}
+.pulse-dot {{ width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;animation:pulse 1.8s infinite;margin-right:5px; }}
 
-section[data-testid="stSidebar"] { background: rgba(15,23,42,0.97) !important; backdrop-filter:blur(20px); }
-section[data-testid="stSidebar"] * { color:#e2e8f0 !important; }
-section[data-testid="stSidebar"] hr { border-color:#1e293b !important; }
-.status-online  { color:#22c55e !important; font-weight:600; font-size:0.92rem; }
-.status-offline { color:#ef4444 !important; font-weight:600; font-size:0.92rem; }
+/* ── Sidebar ── */
+section[data-testid="stSidebar"] {{
+    background: {SIDEBAR_BG} !important;
+    backdrop-filter: blur(20px);
+}}
+section[data-testid="stSidebar"] * {{ color:#e2e8f0 !important; }}
+section[data-testid="stSidebar"] hr {{ border-color:#1e293b !important; }}
+.status-online  {{ color:#22c55e !important; font-weight:700; font-size:0.92rem; }}
+.status-offline {{ color:#ef4444 !important; font-weight:700; font-size:0.92rem; }}
 
-/* ── NAVBAR ── */
-.navbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem 1.5rem;
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    margin-bottom: 1.5rem;
+/* ── Reset notification banner ── */
+.notif-success {{
+    background: rgba(34,197,94,0.15);
+    border: 1.5px solid #22c55e;
     border-radius: 12px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-}
-.nav-logo {
-    font-size: 1.4rem;
-    font-weight: 800;
-    color: #1e293b;
-    letter-spacing: -0.02em;
+    padding: 0.75rem 1.2rem;
+    color: #16a34a;
+    font-weight: 700;
+    font-size: 0.95rem;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-}
-.nav-logo span {
-    color: #6366f1;
-}
-</style>
+    gap: 0.6rem;
+    animation: slideDown 0.4s ease;
+}}
+.notif-fail {{
+    background: rgba(239,68,68,0.12);
+    border: 1.5px solid #ef4444;
+    border-radius: 12px;
+    padding: 0.75rem 1.2rem;
+    color: #dc2626;
+    font-weight: 700;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    animation: slideDown 0.4s ease;
+}}
+@keyframes slideDown {{
+    from {{ opacity:0; transform:translateY(-8px); }}
+    to   {{ opacity:1; transform:translateY(0); }}
+}}
 
+/* ── Stray Streamlit elements ── */
+[data-testid="stVerticalBlock"] > div:has(> [data-testid="stHorizontalBlock"]) {{
+    gap: 0 !important;
+}}
+
+/* Remove default streamlit top padding */
+.block-container {{
+    padding-top: 0 !important;
+}}
+
+/* Force Streamlit buttons in navbar area */
+div[data-testid="column"] > div > div > div > button {{
+    border-radius: 99px !important;
+    font-weight: 700 !important;
+    font-family: 'Inter', sans-serif !important;
+}}
+
+/* Summary card text */
+.summary-info-card {{
+    background: {SUMMARY_BG};
+    border: 1px solid {SUMMARY_BORDER};
+    border-radius: 12px;
+    padding: 1rem 1.2rem;
+    font-size: 0.93rem;
+    color: {TEXT_SECONDARY};
+    line-height: 1.9;
+}}
+
+</style>
 """, unsafe_allow_html=True)
 
-# ─── NAVBAR RENDERING ─────────────────────────────────────────────────────────
-nav_left, nav_right = st.columns([1, 1])
-with nav_left:
-    st.markdown("""
-        <div class="nav-logo">
-            🛡️ TriLogic <span>Intelligence</span>
+
+# ─── NAVBAR ───────────────────────────────────────────────────────────────────
+# Full-width sticky navbar rendered as HTML, toggle as Streamlit button overlaid
+nav_placeholder = st.container()
+with nav_placeholder:
+    n_left, n_mid, n_right = st.columns([5, 3, 2])
+    with n_left:
+        st.markdown(f"""
+        <div style="display:flex;align-items:center;gap:0.6rem;padding:0.7rem 0;">
+            <span style="font-size:1.7rem;filter:drop-shadow(0 0 8px rgba(99,102,241,0.6));">🛡️</span>
+            <span style="font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:900;
+                         color:{TEXT_PRIMARY};letter-spacing:-0.03em;text-transform:uppercase;">
+                TriLogic <span style="color:#6366f1;">Intelligence</span>
+            </span>
         </div>
-    """, unsafe_allow_html=True)
-
-with nav_right:
-    # Use a container to align button to the right
-    col_btn_pad, col_btn = st.columns([3, 1])
-    with col_btn:
-        if st.button("🔄 Reset Stats", use_container_width=True):
-            try:
-                requests.post(f"{API_URL}/reset", timeout=2)
-                st.toast("Stats reset successfully!", icon="✅")
-                time.sleep(1)
+        """, unsafe_allow_html=True)
+    with n_mid:
+        st.markdown(f"""
+        <div style="display:flex;align-items:center;height:100%;padding-top:0.9rem;">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:0.85rem;
+                         color:{TEXT_MUTED};letter-spacing:0.04em;">
+                🕐 {datetime.now().strftime('%H:%M:%S')} &nbsp;·&nbsp; {datetime.now().strftime('%d %b %Y')}
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+    with n_right:
+        btn_col1, btn_col2 = st.columns(2)
+        with btn_col1:
+            # Dark mode toggle
+            toggle_label = "☀️ Light" if dark else "🌙 Dark"
+            if st.button(toggle_label, key="dark_toggle", use_container_width=True):
+                st.session_state.dark_mode = not st.session_state.dark_mode
+                st.session_state.reset_status = None
                 st.rerun()
-            except:
-                st.error("Failed to reset stats.")
+        with btn_col2:
+            # Reset button — FIXED: only sets status, rerun handles display
+            if st.button("🔄 Reset", key="reset_btn", use_container_width=True):
+                try:
+                    r = requests.post(f"{API_URL}/reset", timeout=5)
+                    if r.status_code == 200:
+                        st.session_state.reset_status = "success"
+                    else:
+                        st.session_state.reset_status = "fail"
+                except Exception:
+                    st.session_state.reset_status = "fail"
+                st.rerun()
 
-# ─── THREE.JS NETWORK — Run once per session ──────────────────────────────────
-if "splash_shown" not in st.session_state:
-    st.session_state.splash_shown = False
+# ─── NOTIFICATION BANNER (mutually exclusive) ──────────────────────────────────
+if st.session_state.reset_status == "success":
+    notif_col, close_col = st.columns([10, 1])
+    with notif_col:
+        st.markdown("""
+        <div class="notif-success">
+            ✅ &nbsp; Stats reset successfully!
+        </div>
+        """, unsafe_allow_html=True)
+    with close_col:
+        if st.button("✕", key="close_notif"):
+            st.session_state.reset_status = None
+            st.rerun()
+elif st.session_state.reset_status == "fail":
+    notif_col, close_col = st.columns([10, 1])
+    with notif_col:
+        st.markdown("""
+        <div class="notif-fail">
+            ❌ &nbsp; Failed to reset stats. API may be offline.
+        </div>
+        """, unsafe_allow_html=True)
+    with close_col:
+        if st.button("✕", key="close_notif_fail"):
+            st.session_state.reset_status = None
+            st.rerun()
 
+st.markdown("<div style='height:0.8rem'></div>", unsafe_allow_html=True)
+
+# ─── HORIZONTAL DIVIDER ───────────────────────────────────────────────────────
+st.markdown(f"<hr style='border:none;border-top:1.5px solid {'#1e293b' if dark else '#e2e8f0'};margin:0 0 1.5rem 0;'/>", unsafe_allow_html=True)
+
+# ─── THREE.JS SPLASH ──────────────────────────────────────────────────────────
 if not st.session_state.splash_shown:
     _splash = st.empty()
     with _splash.container():
@@ -291,103 +519,47 @@ if not st.session_state.splash_shown:
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { background:transparent; overflow:hidden; font-family:'Inter',sans-serif; }
-
 #splash {
-    position: relative;
-    width: 100%;
-    height: 500px;
+    position: relative; width: 100%; height: 500px;
     background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 40%, #0f172a 100%);
-    border-radius: 16px;
-    overflow: hidden;
+    border-radius: 16px; overflow: hidden;
     transition: opacity 0.8s ease, height 0.8s ease;
 }
-
-#splash.hiding {
-    opacity: 0;
-    height: 0;
-}
-
+#splash.hiding { opacity: 0; height: 0; }
 canvas { display:block; width:100% !important; height:100% !important; }
-
 #overlay {
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-    z-index: 10;
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    pointer-events: none; z-index: 10;
 }
-
 #title-text {
-    font-size: 2.1rem;
-    font-weight: 900;
-    color: white;
-    letter-spacing: -0.02em;
-    text-align: center;
-    opacity: 0;
-    transform: translateY(12px);
+    font-size: 2.1rem; font-weight: 900; color: white; letter-spacing: -0.02em;
+    text-align: center; opacity: 0; transform: translateY(12px);
     animation: fadeUp 0.8s ease 0.3s forwards;
     text-shadow: 0 0 30px rgba(99,102,241,0.6), 0 2px 8px rgba(0,0,0,0.4);
 }
-
 #sub-text {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: rgba(226,232,240,0.95);
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    margin-top: 0.6rem;
-    text-align: center;
-    opacity: 0;
-    animation: fadeUp 0.8s ease 0.6s forwards;
+    font-size: 0.95rem; font-weight: 700; color: rgba(226,232,240,0.95);
+    letter-spacing: 0.14em; text-transform: uppercase; margin-top: 0.6rem;
+    text-align: center; opacity: 0; animation: fadeUp 0.8s ease 0.6s forwards;
     text-shadow: 0 1px 4px rgba(0,0,0,0.3);
 }
-
 #countdown-ring {
-    margin-top: 1.4rem;
-    position: relative;
-    width: 52px;
-    height: 52px;
-    opacity: 0;
-    animation: fadeUp 0.6s ease 0.9s forwards;
+    margin-top: 1.4rem; position: relative; width: 52px; height: 52px;
+    opacity: 0; animation: fadeUp 0.6s ease 0.9s forwards;
 }
-
-#countdown-ring svg {
-    transform: rotate(-90deg);
-}
-
+#countdown-ring svg { transform: rotate(-90deg); }
 #countdown-num {
-    position: absolute;
-    top: 50%; left: 50%;
+    position: absolute; top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 1.2rem;
-    font-weight: 800;
-    color: #60a5fa;
+    font-size: 1.2rem; font-weight: 800; color: #60a5fa;
 }
-
 #ring-fill {
-    stroke-dasharray: 138;
-    stroke-dashoffset: 0;
+    stroke-dasharray: 138; stroke-dashoffset: 0;
     animation: drainRing 5s linear 1s forwards;
 }
-
-@keyframes drainRing {
-    from { stroke-dashoffset: 0; }
-    to   { stroke-dashoffset: 138; }
-}
-
-@keyframes fadeUp {
-    to { opacity:1; transform:translateY(0); }
-}
-
-#node-labels {
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none;
-    z-index: 5;
-}
+@keyframes drainRing { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 138; } }
+@keyframes fadeUp { to { opacity:1; transform:translateY(0); } }
 </style>
 </head>
 <body>
@@ -400,169 +572,91 @@ canvas { display:block; width:100% !important; height:100% !important; }
             <svg width="52" height="52" viewBox="0 0 52 52">
                 <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(99,102,241,0.25)" stroke-width="3"/>
                 <circle id="ring-fill" cx="26" cy="26" r="22" fill="none"
-                        stroke="#6366f1" stroke-width="3"
-                        stroke-linecap="round"/>
+                        stroke="#6366f1" stroke-width="3" stroke-linecap="round"/>
             </svg>
             <div id="countdown-num">5</div>
         </div>
     </div>
 </div>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-// ── Countdown number ──
 var num = document.getElementById('countdown-num');
-var counts = [5,4,3,2,1];
-counts.forEach(function(n, i) {
+[5,4,3,2,1].forEach(function(n, i) {
     setTimeout(function() { if(num) num.textContent = n; }, i * 1000 + 1000);
 });
-
-// ── Hide splash after 5.8s ──
 setTimeout(function() {
     var splash = document.getElementById('splash');
     if (splash) splash.classList.add('hiding');
 }, 5800);
-
-// ── Three.js ──
 (function() {
     var canvas = document.getElementById('c');
-    var W = canvas.parentElement.offsetWidth || 800;
-    var H = 500;
-
+    var W = canvas.parentElement.offsetWidth || 800, H = 500;
     var renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(W, H);
-    renderer.setClearColor(0x000000, 0);
-
-    var scene  = new THREE.Scene();
+    renderer.setSize(W, H); renderer.setClearColor(0x000000, 0);
+    var scene = new THREE.Scene();
     var camera = new THREE.PerspectiveCamera(60, W / H, 0.1, 1000);
     camera.position.z = 75;
-
-    // Nodes
-    var nodeCount = 70;
-    var nodes = [];
-    var nodeGeom = new THREE.SphereGeometry(0.5, 10, 10);
+    var nodes = [], nodeGeom = new THREE.SphereGeometry(0.5, 10, 10);
     var colors = [0x6366f1, 0x3b82f6, 0x60a5fa, 0x93c5fd, 0xef4444, 0xf59e0b];
-
-    for (var i = 0; i < nodeCount; i++) {
+    for (var i = 0; i < 70; i++) {
         var isAttack = Math.random() > 0.75;
         var mat = new THREE.MeshBasicMaterial({
             color: isAttack ? colors[4] : colors[Math.floor(Math.random() * 4)],
-            transparent: true,
-            opacity: isAttack ? 0.9 : (Math.random() * 0.4 + 0.3)
+            transparent: true, opacity: isAttack ? 0.9 : (Math.random() * 0.4 + 0.3)
         });
         var mesh = new THREE.Mesh(nodeGeom, mat);
-        mesh.position.set(
-            (Math.random() - 0.5) * 160,
-            (Math.random() - 0.5) * 80,
-            (Math.random() - 0.5) * 50
-        );
+        mesh.position.set((Math.random()-0.5)*160,(Math.random()-0.5)*80,(Math.random()-0.5)*50);
         mesh.userData = {
-            vx: (Math.random() - 0.5) * 0.05,
-            vy: (Math.random() - 0.5) * 0.035,
-            vz: (Math.random() - 0.5) * 0.025,
-            pulseSpeed: Math.random() * 0.025 + 0.008,
-            pulseOffset: Math.random() * Math.PI * 2,
-            isAttack: isAttack
+            vx:(Math.random()-0.5)*0.05, vy:(Math.random()-0.5)*0.035, vz:(Math.random()-0.5)*0.025,
+            pulseSpeed:Math.random()*0.025+0.008, pulseOffset:Math.random()*Math.PI*2, isAttack:isAttack
         };
-        scene.add(mesh);
-        nodes.push(mesh);
+        scene.add(mesh); nodes.push(mesh);
     }
-
-    // Edges
     var edgeLines = [];
-    var connDist = 35;
-
     function rebuildEdges() {
-        edgeLines.forEach(function(l) { scene.remove(l); l.geometry.dispose(); l.material.dispose(); });
+        edgeLines.forEach(function(l){scene.remove(l);l.geometry.dispose();l.material.dispose();});
         edgeLines = [];
-        for (var i = 0; i < nodes.length; i++) {
-            for (var j = i + 1; j < nodes.length; j++) {
-                var d = nodes[i].position.distanceTo(nodes[j].position);
-                if (d < connDist) {
-                    var isHot = nodes[i].userData.isAttack || nodes[j].userData.isAttack;
-                    var pts  = [nodes[i].position.clone(), nodes[j].position.clone()];
-                    var geom = new THREE.BufferGeometry().setFromPoints(pts);
-                    var lmat = new THREE.LineBasicMaterial({
-                        color: isHot ? 0xef4444 : 0x6366f1,
-                        transparent: true,
-                        opacity: isHot ? (1 - d/connDist) * 0.35 : (1 - d/connDist) * 0.15
-                    });
-                    var line = new THREE.Line(geom, lmat);
-                    scene.add(line);
-                    edgeLines.push(line);
-                }
+        for (var i=0;i<nodes.length;i++) for (var j=i+1;j<nodes.length;j++) {
+            var d = nodes[i].position.distanceTo(nodes[j].position);
+            if (d < 35) {
+                var isHot = nodes[i].userData.isAttack || nodes[j].userData.isAttack;
+                var geom = new THREE.BufferGeometry().setFromPoints([nodes[i].position.clone(),nodes[j].position.clone()]);
+                var lmat = new THREE.LineBasicMaterial({color:isHot?0xef4444:0x6366f1,transparent:true,opacity:isHot?(1-d/35)*0.35:(1-d/35)*0.15});
+                var line = new THREE.Line(geom,lmat); scene.add(line); edgeLines.push(line);
             }
         }
     }
-
-    // Packets
-    var packetGeom = new THREE.SphereGeometry(0.3, 8, 8);
-    var packets = [];
-
+    var packetGeom = new THREE.SphereGeometry(0.3, 8, 8), packets = [];
     function spawnPacket() {
-        var a = Math.floor(Math.random() * nodes.length);
-        var b = Math.floor(Math.random() * nodes.length);
-        if (a === b) return;
-        var isAttackPkt = nodes[a].userData.isAttack || nodes[b].userData.isAttack;
-        var m = new THREE.Mesh(packetGeom, new THREE.MeshBasicMaterial({
-            color: isAttackPkt ? 0xef4444 : 0x60a5fa,
-            transparent: true, opacity: 0.95
-        }));
-        scene.add(m);
-        packets.push({
-            mesh: m,
-            from: nodes[a].position.clone(),
-            to: nodes[b].position.clone(),
-            t: 0,
-            speed: 0.015 + Math.random() * 0.015
-        });
+        var a=Math.floor(Math.random()*nodes.length), b=Math.floor(Math.random()*nodes.length);
+        if(a===b) return;
+        var isAtk = nodes[a].userData.isAttack||nodes[b].userData.isAttack;
+        var m = new THREE.Mesh(packetGeom, new THREE.MeshBasicMaterial({color:isAtk?0xef4444:0x60a5fa,transparent:true,opacity:0.95}));
+        scene.add(m); packets.push({mesh:m,from:nodes[a].position.clone(),to:nodes[b].position.clone(),t:0,speed:0.015+Math.random()*0.015});
     }
-    for (var p = 0; p < 15; p++) spawnPacket();
-
-    var clock = new THREE.Clock();
-    var frame = 0;
-
+    for (var p=0;p<15;p++) spawnPacket();
+    var clock=new THREE.Clock(), frame=0;
     function animate() {
         requestAnimationFrame(animate);
-        var t = clock.getElapsedTime();
-        frame++;
-
+        var t=clock.getElapsedTime(); frame++;
         nodes.forEach(function(n) {
-            var s = 1 + 0.3 * Math.sin(t * n.userData.pulseSpeed * 60 + n.userData.pulseOffset);
-            n.scale.setScalar(s);
-            n.position.x += n.userData.vx;
-            n.position.y += n.userData.vy;
-            n.position.z += n.userData.vz;
-            if (Math.abs(n.position.x) > 80)  n.userData.vx *= -1;
-            if (Math.abs(n.position.y) > 40)  n.userData.vy *= -1;
-            if (Math.abs(n.position.z) > 25)  n.userData.vz *= -1;
+            n.scale.setScalar(1+0.3*Math.sin(t*n.userData.pulseSpeed*60+n.userData.pulseOffset));
+            n.position.x+=n.userData.vx; n.position.y+=n.userData.vy; n.position.z+=n.userData.vz;
+            if(Math.abs(n.position.x)>80) n.userData.vx*=-1;
+            if(Math.abs(n.position.y)>40) n.userData.vy*=-1;
+            if(Math.abs(n.position.z)>25) n.userData.vz*=-1;
         });
-
-        if (frame % 45 === 0) rebuildEdges();
-
-        for (var i = packets.length - 1; i >= 0; i--) {
-            var pk = packets[i];
-            pk.t += pk.speed;
-            if (pk.t >= 1) {
-                scene.remove(pk.mesh);
-                pk.mesh.geometry.dispose();
-                pk.mesh.material.dispose();
-                packets.splice(i, 1);
-                spawnPacket();
-            } else {
-                pk.mesh.position.lerpVectors(pk.from, pk.to, pk.t);
-            }
+        if(frame%45===0) rebuildEdges();
+        for(var i=packets.length-1;i>=0;i--) {
+            var pk=packets[i]; pk.t+=pk.speed;
+            if(pk.t>=1){scene.remove(pk.mesh);pk.mesh.geometry.dispose();pk.mesh.material.dispose();packets.splice(i,1);spawnPacket();}
+            else pk.mesh.position.lerpVectors(pk.from,pk.to,pk.t);
         }
-
-        camera.position.x = Math.sin(t * 0.05) * 10;
-        camera.position.y = Math.cos(t * 0.04) * 5;
-        camera.lookAt(scene.position);
-        renderer.render(scene, camera);
+        camera.position.x=Math.sin(t*0.05)*10; camera.position.y=Math.cos(t*0.04)*5;
+        camera.lookAt(scene.position); renderer.render(scene,camera);
     }
-
-    rebuildEdges();
-    animate();
+    rebuildEdges(); animate();
 })();
 </script>
 </body>
@@ -572,11 +666,7 @@ setTimeout(function() {
     _splash.empty()
     st.session_state.splash_shown = True
 
-# ─── SESSION STATE ────────────────────────────────────────────────────────────
-for k, v in [("alerted_ids", set()), ("alert_log", []), ("sound_enabled", True)]:
-    if k not in st.session_state:
-        st.session_state[k] = v
-
+# ─── ALERT SOUND ──────────────────────────────────────────────────────────────
 ALERT_SOUND = """<script>
 try {
   var ctx=new(window.AudioContext||window.webkitAudioContext)();
@@ -588,33 +678,6 @@ try {
   osc.start();osc.stop(ctx.currentTime+0.4);
 }catch(e){}
 </script>"""
-
-# ─── API HELPERS ──────────────────────────────────────────────────────────────
-def fetch(endpoint, timeout=10):
-    try:
-        r = requests.get(f"{API_URL}/{endpoint}", timeout=timeout)
-        if r.status_code == 200:
-            return r.json()
-    except:
-        pass
-    return None
-
-def post_api(endpoint, payload):
-    try:
-        requests.post(f"{API_URL}/{endpoint}", json=payload, timeout=2)
-    except:
-        pass
-
-def fetch_history():
-    return fetch(f"history?limit={HISTORY_LIMIT}") or []
-
-def fetch_stats():
-    return fetch("stats") or {}
-
-def fetch_model():
-    return fetch("model_info") or {}
-
-
 
 # ─── SIDEBAR ──────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -639,7 +702,26 @@ with st.sidebar:
     else:
         st.caption("No actions yet")
 
-# ─── FETCH ────────────────────────────────────────────────────────────────────
+# ─── API HELPERS ──────────────────────────────────────────────────────────────
+def fetch(endpoint, timeout=10):
+    try:
+        r = requests.get(f"{API_URL}/{endpoint}", timeout=timeout)
+        if r.status_code == 200:
+            return r.json()
+    except:
+        pass
+    return None
+
+def fetch_history():
+    return fetch(f"history?limit={HISTORY_LIMIT}") or []
+
+def fetch_stats():
+    return fetch("stats") or {}
+
+def fetch_model():
+    return fetch("model_info") or {}
+
+# ─── FETCH DATA ───────────────────────────────────────────────────────────────
 import concurrent.futures
 with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
     f1 = ex.submit(fetch_history)
@@ -649,7 +731,7 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
     stats   = f2.result()
     model   = f3.result()
 
-# ─── SOUND ────────────────────────────────────────────────────────────────────
+# ─── SOUND ALERT ──────────────────────────────────────────────────────────────
 if history and st.session_state.sound_enabled:
     new_high = [h for h in history[-5:]
                 if h.get("threat_level") == "HIGH"
@@ -659,19 +741,19 @@ if history and st.session_state.sound_enabled:
         for h in new_high:
             st.session_state.alerted_ids.add(h["timestamp"])
 
-# ─── HEADER ───────────────────────────────────────────────────────────────────
+# ─── PAGE HEADER ──────────────────────────────────────────────────────────────
 col_title, col_time = st.columns([3,1])
 with col_title:
-    st.markdown("""
+    st.markdown(f"""
         <p class="page-title">🛡️ Cyber Threat Intelligence</p>
         <p class="page-subtitle"><span class="pulse-dot"></span>Live monitoring · AI-powered · Random Forest + Isolation Forest · CICIDS2017</p>
     """, unsafe_allow_html=True)
 with col_time:
     st.markdown(f"""
         <div style="text-align:right;padding-top:0.8rem">
-            <div style="font-size:0.82rem;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.06em">Last Updated</div>
-            <div style="font-size:1.05rem;font-weight:700;color:#334155;font-family:'JetBrains Mono',monospace">{datetime.now().strftime('%H:%M:%S')}</div>
-            <div style="font-size:0.86rem;color:#94a3b8">{datetime.now().strftime('%d %b %Y')}</div>
+            <div style="font-size:0.82rem;color:{TEXT_MUTED};font-weight:700;text-transform:uppercase;letter-spacing:0.06em">Last Updated</div>
+            <div style="font-size:1.05rem;font-weight:700;color:{TEXT_SECONDARY};font-family:'JetBrains Mono',monospace">{datetime.now().strftime('%H:%M:%S')}</div>
+            <div style="font-size:0.86rem;color:{TEXT_MUTED}">{datetime.now().strftime('%d %b %Y')}</div>
         </div>""", unsafe_allow_html=True)
 
 st.markdown("<div style='margin-bottom:1.2rem'></div>", unsafe_allow_html=True)
@@ -685,11 +767,9 @@ attack_counts = stats.get("attack_counts", {})
 high_pct = round(high / total * 100) if total else 0
 risk_color = "red" if avg_risk > 0.7 else "amber" if avg_risk > 0.4 else "green"
 
-# Live confidence from model_info
 live_conf     = float(model.get("live_confidence") or 0)
 live_conf_pct = round(live_conf * 100, 1)
 
-# Attacks per minute — count events in last 60s
 attacks_per_min = 0
 if history:
     try:
@@ -717,7 +797,7 @@ with k6:
 
 st.markdown("<div style='margin-bottom:1rem'></div>", unsafe_allow_html=True)
 
-# ─── THREAT SEVERITY GAUGE ────────────────────────────────────────────────────
+# ─── GAUGE + THREAT SUMMARY ───────────────────────────────────────────────────
 col_gauge, col_gauge_info = st.columns([1, 3])
 with col_gauge:
     st.markdown('<div class="chart-card">', unsafe_allow_html=True)
@@ -734,18 +814,18 @@ with col_gauge:
     fig_gauge = go.Figure(go.Indicator(
         mode="gauge+number",
         value=gauge_val,
-        number={"suffix": "%", "font": {"size": 28, "family": "Inter", "color": gauge_color}},
+        number={"suffix": "%", "font": {"size": 28, "family": "Syne", "color": gauge_color}},
         gauge={
             "axis": {"range": [0, 100], "tickwidth": 1, "tickcolor": "#94a3b8",
                      "tickfont": {"size": 10, "color": "#94a3b8"}},
             "bar": {"color": gauge_color, "thickness": 0.25},
-            "bgcolor": "white",
+            "bgcolor": "rgba(0,0,0,0)",
             "borderwidth": 0,
             "steps": [
-                {"range": [0,  25],  "color": "#dcfce7"},
-                {"range": [25, 50],  "color": "#fef9c3"},
-                {"range": [50, 75],  "color": "#ffedd5"},
-                {"range": [75, 100], "color": "#fee2e2"},
+                {"range": [0,  25],  "color": "rgba(34,197,94,0.15)"},
+                {"range": [25, 50],  "color": "rgba(245,158,11,0.15)"},
+                {"range": [50, 75],  "color": "rgba(249,115,22,0.15)"},
+                {"range": [75, 100], "color": "rgba(239,68,68,0.15)"},
             ],
             "threshold": {"line": {"color": gauge_color, "width": 3},
                           "thickness": 0.8, "value": gauge_val},
@@ -754,7 +834,7 @@ with col_gauge:
     fig_gauge.update_layout(
         paper_bgcolor="rgba(0,0,0,0)", margin=dict(l=20,r=20,t=30,b=10), height=200,
         annotations=[dict(text=f"<b>{gauge_label}</b>", x=0.5, y=0.2,
-                          font=dict(size=16, color=gauge_color, family="Inter"),
+                          font=dict(size=16, color=gauge_color, family="Syne"),
                           showarrow=False)]
     )
     st.plotly_chart(fig_gauge, use_container_width=True, config={"displayModeBar": False})
@@ -773,19 +853,13 @@ with col_gauge_info:
         anomaly_rate = round(anomaly / total * 100) if total else 0
         summary_color = gauge_color
 
-        # ── Threat Prediction Algorithm ──────────────────────────────────────
-        # Uses last 10 events to find trending attack, weighted so recent
-        # events matter more than older ones (weight = position index)
         last10 = [h.get("attack_type","Other") for h in history[-10:]]
         weighted_counts = {}
         for i, atk in enumerate(last10):
-            weight = i + 1          # more recent = higher index = higher weight
+            weight = i + 1
             weighted_counts[atk] = weighted_counts.get(atk, 0) + weight
-
-        # Remove "Other" / "Normal Traffic" from prediction — not useful
         for exclude in ["Other", "Normal Traffic"]:
             weighted_counts.pop(exclude, None)
-
         if weighted_counts:
             predicted_next = max(weighted_counts, key=weighted_counts.get)
             pred_score     = weighted_counts[predicted_next]
@@ -793,14 +867,12 @@ with col_gauge_info:
             pred_confidence = round(pred_score / pred_total * 100)
             pred_basis     = f"{len(last10)} recent events, trend-weighted"
         else:
-            # All recent traffic is normal — predict it stays normal
             predicted_next  = "Normal Traffic"
             pred_confidence = 90
             pred_basis      = "no attacks in recent traffic"
 
         pred_color = ATTACK_COLORS.get(predicted_next, "#334155")
         conf_color = "#22c55e" if pred_confidence >= 60 else "#f59e0b"
-        # ─────────────────────────────────────────────────────────────────────
 
         st.markdown(f"""
         <style>
@@ -837,27 +909,25 @@ with col_gauge_info:
         }}
         .pred-dot {{
             width:7px; height:7px; border-radius:50%;
-            background:{pred_color};
-            display:inline-block;
+            background:{pred_color}; display:inline-block;
             animation: blink 1.2s infinite;
         }}
         .pred-name {{
+            font-family:'Syne',sans-serif;
             font-size:1.45rem; font-weight:800;
-            color:{pred_color}; letter-spacing:-0.02em;
-            line-height:1.1;
+            color:{pred_color}; letter-spacing:-0.02em; line-height:1.1;
         }}
         .conf-bar-bg {{
-            background:#e2e8f0; border-radius:99px;
+            background:{"#1e293b" if dark else "#e2e8f0"}; border-radius:99px;
             height:5px; width:100%; margin-top:0.5rem; overflow:hidden;
         }}
         .conf-bar-fill {{
             height:100%; border-radius:99px;
             background: linear-gradient(90deg, {pred_color}88, {pred_color});
-            width:{pred_confidence}%;
-            transition: width 1s ease;
+            width:{pred_confidence}%; transition: width 1s ease;
         }}
         </style>
-        <div style="background:#f8fafc;border-radius:12px;padding:1rem 1.2rem;border:1px solid #e2e8f0;font-size:0.93rem;color:#334155;line-height:1.9">
+        <div class="summary-info-card">
             <div>🔴 <b>Dominant Threat:</b> <span style="color:{ATTACK_COLORS.get(top_attack,'#334155')};font-weight:700">{top_attack}</span> — {top_count} events detected</div>
             <div>⚡ <b>Current Threat Level:</b> <span style="color:{summary_color};font-weight:700">{gauge_label}</span> (Risk Score: {avg_risk:.2f})</div>
             <div>🌐 <b>Latest Source IP:</b> <span style="font-family:'JetBrains Mono',monospace">{recent_ip}</span> — Risk {recent_risk:.2f} at {recent_ts[11:]}</div>
@@ -873,11 +943,11 @@ with col_gauge_info:
                 <div class="pred-name">{predicted_next}</div>
                 <div style="text-align:right">
                     <div style="font-size:1.2rem;font-weight:800;color:{conf_color}">{pred_confidence}%</div>
-                    <div style="font-size:0.78rem;color:#94a3b8;font-weight:600">CONFIDENCE</div>
+                    <div style="font-size:0.78rem;color:{TEXT_MUTED};font-weight:700">CONFIDENCE</div>
                 </div>
             </div>
             <div class="conf-bar-bg"><div class="conf-bar-fill"></div></div>
-            <div style="font-size:0.8rem;color:#94a3b8;margin-top:0.4rem">
+            <div style="font-size:0.8rem;color:{TEXT_MUTED};margin-top:0.4rem">
                 Based on {pred_basis}
             </div>
         </div>
@@ -885,6 +955,8 @@ with col_gauge_info:
     else:
         st.info("Waiting for threat data to generate summary…")
     st.markdown('</div>', unsafe_allow_html=True)
+
+# ─── MAP + PIE ────────────────────────────────────────────────────────────────
 col_map, col_pie = st.columns([3, 2])
 
 with col_map:
@@ -918,20 +990,24 @@ with col_map:
                 text=sub.apply(lambda r: f"<b>{r['city']}</b><br>Type: {r['attack']}<br>Count: {r['count']}<br>Avg Risk: {r['avg_risk']:.2f}", axis=1),
                 hoverinfo="text",
             ))
+        map_land  = "#1e293b" if dark else "#f1f5f9"
+        map_ocean = "#0f172a" if dark else "#dbeafe"
+        map_country = "#334155" if dark else "#cbd5e1"
         fig_map.update_layout(
             geo=dict(
                 projection_type="natural earth",
-                showland=True,  landcolor="#f1f5f9",
-                showocean=True, oceancolor="#dbeafe",
-                showcountries=True, countrycolor="#cbd5e1", countrywidth=0.5,
-                coastlinecolor="#94a3b8", coastlinewidth=0.5,
+                showland=True,  landcolor=map_land,
+                showocean=True, oceancolor=map_ocean,
+                showcountries=True, countrycolor=map_country, countrywidth=0.5,
+                coastlinecolor="#475569", coastlinewidth=0.5,
                 showframe=False, bgcolor="rgba(0,0,0,0)",
             ),
             paper_bgcolor="rgba(0,0,0,0)",
             margin=dict(l=0,r=0,t=0,b=0), height=340,
             legend=dict(orientation="h", yanchor="bottom", y=-0.12,
                         xanchor="center", x=0.5, font=dict(size=11),
-                        bgcolor="rgba(255,255,255,0.85)", bordercolor="#e2e8f0", borderwidth=1),
+                        bgcolor=f"{'rgba(15,23,42,0.9)' if dark else 'rgba(255,255,255,0.85)'}",
+                        bordercolor=f"{'#1e293b' if dark else '#e2e8f0'}", borderwidth=1),
         )
         st.plotly_chart(fig_map, use_container_width=True, config={"displayModeBar": False})
     else:
@@ -952,21 +1028,21 @@ with col_pie:
         ))
         fig_pie.update_layout(
             paper_bgcolor="rgba(0,0,0,0)", margin=dict(l=10,r=10,t=10,b=10), height=200,
-            legend=dict(orientation="v", font=dict(size=11), x=1.02, y=0.5, bgcolor="rgba(0,0,0,0)"),
+            legend=dict(orientation="v", font=dict(size=11, color=TEXT_PRIMARY), x=1.02, y=0.5, bgcolor="rgba(0,0,0,0)"),
             annotations=[dict(text=f"<b>{total_events}</b><br><span>Events</span>",
-                              x=0.5, y=0.5, font=dict(size=15, family="Inter"), showarrow=False)]
+                              x=0.5, y=0.5, font=dict(size=15, family="Syne", color=TEXT_PRIMARY), showarrow=False)]
         )
         st.plotly_chart(fig_pie, use_container_width=True, config={"displayModeBar": False})
         for att, cnt in sorted(attack_counts.items(), key=lambda x: -x[1]):
             color = ATTACK_COLORS.get(att, "#94a3b8")
             pct   = round(cnt / total_events * 100)
             st.markdown(f"""
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:0.28rem 0;border-bottom:1px solid #f1f5f9;font-size:0.89rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:0.28rem 0;border-bottom:1px solid {ROW_BORDER};font-size:0.89rem">
                 <div style="display:flex;align-items:center;gap:0.4rem">
                     <span style="width:9px;height:9px;border-radius:50%;background:{color};display:inline-block"></span>
-                    <span style="color:#334155;font-weight:500">{att}</span>
+                    <span style="color:{TEXT_SECONDARY};font-weight:500">{att}</span>
                 </div>
-                <span style="color:#64748b;font-variant-numeric:tabular-nums">{cnt} <span style="color:#cbd5e1">({pct}%)</span></span>
+                <span style="color:{TEXT_MUTED};font-variant-numeric:tabular-nums">{cnt} <span style="color:{'#334155' if not dark else '#64748b'}">({pct}%)</span></span>
             </div>""", unsafe_allow_html=True)
     else:
         st.info("Waiting for data…")
@@ -974,7 +1050,7 @@ with col_pie:
 
 st.markdown("<div style='margin-bottom:0.5rem'></div>", unsafe_allow_html=True)
 
-# ─── ROW 3: RISK TIMELINE + LIVE ALERTS ───────────────────────────────────────
+# ─── RISK TIMELINE + LIVE ALERTS ──────────────────────────────────────────────
 col_line, col_alerts = st.columns([3, 2])
 
 with col_line:
@@ -985,7 +1061,6 @@ with col_line:
         df_line["timestamp"] = pd.to_datetime(df_line["timestamp"])
         df_line = df_line.sort_values("timestamp")
         fig_line = go.Figure()
-        # Shaded zones
         fig_line.add_hrect(y0=0.7,y1=1.05, fillcolor="rgba(239,68,68,0.07)",  line_width=0, annotation_text="HIGH", annotation_position="right", annotation_font=dict(color="#ef4444",size=10))
         fig_line.add_hrect(y0=0.4,y1=0.7,  fillcolor="rgba(245,158,11,0.07)", line_width=0, annotation_text="MED",  annotation_position="right", annotation_font=dict(color="#f59e0b",size=10))
         fig_line.add_hrect(y0=0,  y1=0.4,  fillcolor="rgba(34,197,94,0.07)",  line_width=0, annotation_text="LOW",  annotation_position="right", annotation_font=dict(color="#22c55e",size=10))
@@ -1002,11 +1077,11 @@ with col_line:
         fig_line.update_layout(
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
             height=285, margin=dict(l=10,r=60,t=10,b=10),
-            yaxis=dict(range=[0,1.05], tickformat=".1f", gridcolor="#f1f5f9",
-                       tickfont=dict(size=10,color="#94a3b8"), title=None, zeroline=False),
-            xaxis=dict(gridcolor="#f1f5f9", tickfont=dict(size=10,color="#94a3b8"), title=None),
+            yaxis=dict(range=[0,1.05], tickformat=".1f", gridcolor=PLOT_GRID,
+                       tickfont=dict(size=10,color=TICK_COLOR), title=None, zeroline=False),
+            xaxis=dict(gridcolor=PLOT_GRID, tickfont=dict(size=10,color=TICK_COLOR), title=None),
             legend=dict(orientation="h", yanchor="bottom", y=-0.22, xanchor="center", x=0.5,
-                        font=dict(size=11), bgcolor="rgba(0,0,0,0)"),
+                        font=dict(size=11, color=TEXT_PRIMARY), bgcolor="rgba(0,0,0,0)"),
             hovermode="x unified",
         )
         st.plotly_chart(fig_line, use_container_width=True, config={"displayModeBar": False})
@@ -1035,7 +1110,7 @@ with col_alerts:
                 </div>
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
                     <span class="alert-tag {tag_cls}">{level}</span>
-                    <span style="font-size:0.83rem;font-weight:700">{risk:.2f}</span>
+                    <span style="font-size:0.83rem;font-weight:700;color:{TEXT_PRIMARY}">{risk:.2f}</span>
                 </div>
             </div>""", unsafe_allow_html=True)
     else:
@@ -1044,7 +1119,7 @@ with col_alerts:
 
 st.markdown("<div style='margin-bottom:0.5rem'></div>", unsafe_allow_html=True)
 
-# ─── ROW 4: MODEL STATS + SUSPICIOUS IPs + BAR CHART ─────────────────────────
+# ─── MODEL STATS + SUSPICIOUS IPs + BAR CHART ─────────────────────────────────
 col_model, col_ips, col_bar = st.columns([1.2, 1.4, 1.4])
 
 with col_model:
@@ -1064,16 +1139,16 @@ with col_model:
         <div class="model-stat"><div class="model-stat-val" style="font-size:1.4rem">{trees}</div><div class="model-stat-lbl">Trees</div></div>
         <div class="model-stat"><div class="model-stat-val" style="font-size:1.4rem">{feats}</div><div class="model-stat-lbl">Features</div></div>
     </div>
-    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:0.6rem 0.8rem;font-size:0.86rem;color:#475569;line-height:1.7">
+    <div style="background:{MODEL_STAT_BG};border:1px solid {MODEL_STAT_BORDER};border-radius:10px;padding:0.6rem 0.8rem;font-size:0.86rem;color:{TEXT_SECONDARY};line-height:1.7">
         <div><b>Algorithm:</b> Random Forest</div>
         <div><b>Anomaly:</b> Isolation Forest — {iso}</div>
         <div><b>Dataset:</b> CICIDS2017</div>
     </div>
     <div style="margin-top:0.8rem">
-        <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:#94a3b8;margin-bottom:0.3rem">
+        <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:{TEXT_MUTED};margin-bottom:0.3rem">
             <span>Model Confidence</span><span>{acc*100:.1f}%</span>
         </div>
-        <div style="background:#f1f5f9;border-radius:99px;height:6px;overflow:hidden">
+        <div style="background:{'#1e293b' if dark else '#f1f5f9'};border-radius:99px;height:6px;overflow:hidden">
             <div style="width:{acc*100}%;height:100%;border-radius:99px;background:linear-gradient(90deg,#22c55e,#16a34a)"></div>
         </div>
     </div>
@@ -1103,7 +1178,7 @@ with col_ips:
                         <span style="font-size:0.78rem;color:{color};font-weight:600;margin-left:0.3rem">{row['top_attack']}</span>
                     </div>
                     <div style="display:flex;align-items:center;gap:0.4rem">
-                        <span style="font-size:0.8rem;color:#94a3b8">{row['avg_risk']:.2f}</span>
+                        <span style="font-size:0.8rem;color:{TEXT_MUTED}">{row['avg_risk']:.2f}</span>
                         <span class="count-badge">{row['attacks']}</span>
                     </div>
                 </div>""", unsafe_allow_html=True)
@@ -1122,14 +1197,14 @@ with col_bar:
             x=df_bar["Count"], y=df_bar["Attack"], orientation="h",
             marker=dict(color=[ATTACK_COLORS.get(a,"#94a3b8") for a in df_bar["Attack"]], line=dict(width=0)),
             text=df_bar["Count"], textposition="outside",
-            textfont=dict(size=11, family="Inter", color="#475569"),
+            textfont=dict(size=11, family="Inter", color=TEXT_SECONDARY),
             hovertemplate="<b>%{y}</b>: %{x} events<extra></extra>",
         ))
         fig_bar.update_layout(
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
             height=240, margin=dict(l=0,r=40,t=0,b=10),
-            xaxis=dict(gridcolor="#f1f5f9", tickfont=dict(size=10,color="#94a3b8"), title=None, zeroline=False),
-            yaxis=dict(tickfont=dict(size=11,color="#334155",family="Inter"), title=None),
+            xaxis=dict(gridcolor=PLOT_GRID, tickfont=dict(size=10,color=TICK_COLOR), title=None, zeroline=False),
+            yaxis=dict(tickfont=dict(size=11,color=TEXT_SECONDARY,family="Inter"), title=None),
             bargap=0.35,
         )
         st.plotly_chart(fig_bar, use_container_width=True, config={"displayModeBar": False})
@@ -1137,7 +1212,7 @@ with col_bar:
         st.info("Waiting for data…")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ─── ROW 5: NETWORK TRAFFIC VOLUME + EXPORT ───────────────────────────────────
+# ─── TRAFFIC VOLUME + EXPORT ───────────────────────────────────────────────────
 col_traffic, col_export = st.columns([3, 1])
 
 with col_traffic:
@@ -1147,7 +1222,6 @@ with col_traffic:
         df_vol = pd.DataFrame(history)
         df_vol["timestamp"] = pd.to_datetime(df_vol["timestamp"])
         df_vol = df_vol.sort_values("timestamp")
-        # Bucket into 10-second intervals
         df_vol["bucket"] = df_vol["timestamp"].dt.floor("10s")
         vol_data = df_vol.groupby("bucket").size().reset_index(name="count")
         fig_area = go.Figure()
@@ -1162,8 +1236,8 @@ with col_traffic:
         fig_area.update_layout(
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
             height=200, margin=dict(l=10,r=10,t=10,b=10),
-            xaxis=dict(gridcolor="#f1f5f9", tickfont=dict(size=10,color="#94a3b8"), title=None),
-            yaxis=dict(gridcolor="#f1f5f9", tickfont=dict(size=10,color="#94a3b8"), title=None, zeroline=False),
+            xaxis=dict(gridcolor=PLOT_GRID, tickfont=dict(size=10,color=TICK_COLOR), title=None),
+            yaxis=dict(gridcolor=PLOT_GRID, tickfont=dict(size=10,color=TICK_COLOR), title=None, zeroline=False),
             showlegend=False, hovermode="x unified",
         )
         st.plotly_chart(fig_area, use_container_width=True, config={"displayModeBar": False})
@@ -1176,7 +1250,6 @@ with col_export:
     st.markdown('<p class="section-header"><span class="dot" style="background:#22c55e"></span>Export Report</p>', unsafe_allow_html=True)
     if history:
         df_export = pd.DataFrame(history)
-        # CSV export
         csv_data = df_export.to_csv(index=False).encode("utf-8")
         st.download_button(
             label="⬇️ Download CSV",
@@ -1186,12 +1259,11 @@ with col_export:
             use_container_width=True,
         )
         st.markdown("<div style='margin-top:0.5rem'></div>", unsafe_allow_html=True)
-        # Summary text export
         summary_lines = [
-            f"CyberThreat Intelligence Report",
+            "CyberThreat Intelligence Report",
             f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            f"",
-            f"SUMMARY",
+            "",
+            "SUMMARY",
             f"Total Events : {total}",
             f"High Risk    : {high} ({high_pct}%)",
             f"Avg Risk     : {avg_risk:.4f}",
@@ -1199,8 +1271,8 @@ with col_export:
             f"Threat Level : {gauge_label}",
             f"Attacks/Min  : {attacks_per_min}",
             f"Confidence   : {live_conf_pct}%",
-            f"",
-            f"ATTACK BREAKDOWN",
+            "",
+            "ATTACK BREAKDOWN",
         ]
         for att, cnt in sorted(attack_counts.items(), key=lambda x: -x[1]):
             summary_lines.append(f"  {att:<18}: {cnt}")
@@ -1213,7 +1285,7 @@ with col_export:
             use_container_width=True,
         )
         st.markdown(f"""
-        <div style="margin-top:0.8rem;font-size:0.85rem;color:#94a3b8;text-align:center">
+        <div style="margin-top:0.8rem;font-size:0.85rem;color:{TEXT_MUTED};text-align:center">
             {len(df_export)} records ready
         </div>""", unsafe_allow_html=True)
     else:
