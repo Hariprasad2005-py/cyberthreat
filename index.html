@@ -20,21 +20,40 @@
     --white:   #ffffff;
     --border:  #e2e8f0;
     --card-bg: #ffffff;
+    --hero-bg: linear-gradient(180deg, #e8f4fd 0%, #f0f7ff 100%);
+    --nav-bg:  rgba(240,247,255,0.92);
   }
 
-  html { scroll-behavior: smooth; }
+  [data-theme="dark"] {
+    --blue:    #3b82f6;
+    --blue-lt: #60a5fa;
+    --teal:    #38bdf8;
+    --dark:    #f8fafc;
+    --dark2:   #f1f5f9;
+    --gray:    #94a3b8;
+    --gray-lt: #64748b;
+    --light:   #0f172a;
+    --white:   #1e293b;
+    --border:  #334155;
+    --card-bg: #1e293b;
+    --hero-bg: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+    --nav-bg:  rgba(15, 23, 42, 0.92);
+  }
+
+  html { scroll-behavior: smooth; transition: background 0.3s, color 0.3s; }
 
   body {
     font-family: 'Inter', sans-serif;
-    background: #f0f7ff;
-    color: #0f172a;
+    background: var(--light);
+    color: var(--dark);
     line-height: 1.6;
+    transition: background 0.3s, color 0.3s;
   }
 
   /* ── NAV ── */
   nav {
     position: fixed; top: 0; left: 0; right: 0;
-    background: rgba(240,247,255,0.92);
+    background: var(--nav-bg);
     backdrop-filter: blur(16px);
     border-bottom: 1px solid var(--border);
     z-index: 1000;
@@ -50,14 +69,45 @@
   }
   .nav-logo span { color: var(--blue); }
 
-  .nav-links {
-    display: flex; gap: 2rem; list-style: none;
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
   }
-  .nav-links a {
-    font-size: 0.88rem; font-weight: 500; color: var(--gray);
-    text-decoration: none; transition: color 0.2s;
+
+  .btn-theme {
+    background: var(--white);
+    color: var(--dark);
+    border: 1.5px solid var(--border);
+    padding: 0.45rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
   }
-  .nav-links a:hover { color: var(--dark); }
+  .btn-theme:hover { border-color: var(--blue); }
+
+  .btn-reset {
+    background: var(--white);
+    color: var(--dark);
+    border: 1.5px solid var(--border);
+    padding: 0.45rem 1.1rem;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .btn-reset:hover { border-color: #ef4444; color: #ef4444; background: #fff1f2; }
 
   .btn-primary {
     background: var(--blue);
@@ -74,26 +124,11 @@
   }
   .btn-primary:hover { background: #1d4ed8; transform: translateY(-1px); }
 
-  .btn-secondary {
-    background: white;
-    color: var(--dark);
-    border: 1.5px solid var(--border);
-    padding: 0.55rem 1.3rem;
-    border-radius: 8px;
-    font-size: 0.88rem;
-    font-weight: 600;
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-block;
-    transition: border-color 0.2s, transform 0.15s;
-  }
-  .btn-secondary:hover { border-color: var(--blue); transform: translateY(-1px); }
-
   /* ── HERO ── */
   .hero {
     padding: 120px 5% 80px;
     text-align: center;
-    background: linear-gradient(180deg, #e8f4fd 0%, #f0f7ff 100%);
+    background: var(--hero-bg);
   }
 
   .hero-badge {
@@ -286,7 +321,7 @@
 
   /* ── THREAT LANDSCAPE ── */
   .threat-section {
-    background: white;
+    background: var(--white);
   }
 
   .threat-grid {
@@ -318,7 +353,7 @@
   }
 
   .why-ai-card {
-    background: #f8fafc;
+    background: var(--white);
     border: 1px solid var(--border);
     border-radius: 14px;
     padding: 1.8rem;
@@ -344,14 +379,14 @@
 
   /* ── ABSTRACT ── */
   .abstract-section {
-    background: #f8fafc;
+    background: var(--light);
     text-align: center;
   }
 
   .abstract-card {
     max-width: 720px;
     margin: 2rem auto 0;
-    background: white;
+    background: var(--white);
     border: 1px solid var(--border);
     border-radius: 18px;
     padding: 2.5rem;
@@ -386,7 +421,7 @@
 
   .badge-icon {
     width: 44px; height: 44px; border-radius: 10px;
-    background: #e8f4fd;
+    background: var(--light);
     display: flex; align-items: center; justify-content: center;
   }
 
@@ -400,7 +435,7 @@
 
   /* ── TEAM ── */
   .team-section {
-    background: white;
+    background: var(--white);
     text-align: center;
   }
 
@@ -416,7 +451,7 @@
   }
 
   .team-card {
-    background: #f8fafc;
+    background: var(--white);
     border: 1px solid var(--border);
     border-radius: 16px;
     padding: 2rem 2.5rem;
@@ -451,7 +486,7 @@
 
   /* ── CTA ── */
   .cta-section {
-    background: var(--dark);
+    background: var(--dark2);
     text-align: center;
     padding: 80px 5%;
     border-radius: 24px;
@@ -460,12 +495,12 @@
 
   .cta-section h2 {
     font-size: 2rem; font-weight: 900;
-    color: white; margin-bottom: 0.8rem;
+    color: var(--white); margin-bottom: 0.8rem;
     letter-spacing: -0.02em;
   }
 
   .cta-section p {
-    font-size: 0.95rem; color: #94a3b8;
+    font-size: 0.95rem; color: var(--gray);
     max-width: 420px; margin: 0 auto 2rem;
   }
 
@@ -496,7 +531,6 @@
 
   @media (max-width: 768px) {
     .threat-grid { grid-template-columns: 1fr; }
-    .nav-links { display: none; }
     .hero h1 { font-size: 2rem; }
   }
 </style>
@@ -508,12 +542,14 @@
   <a href="#" class="nav-logo">
     🛡️ <span>TriLogic</span> Intelligence
   </a>
-  <ul class="nav-links">
-    <li><a href="#problem">Problem</a></li>
-    <li><a href="#abstract">Abstract</a></li>
-    <li><a href="#team">Team</a></li>
-  </ul>
-  <a href="https://cyberthreat-dashboard.onrender.com" target="_blank" class="btn-primary">Launch Dashboard</a>
+  <div class="nav-right">
+    <button id="theme-toggle" class="btn-theme" title="Toggle Theme">
+      🌙
+    </button>
+    <button class="btn-reset" onclick="location.reload()">
+      🔄 Reset
+    </button>
+  </div>
 </nav>
 
 <!-- ── HERO ── -->
@@ -674,6 +710,28 @@
   <p>⚡ PROJECT TRILOGIC</p>
   <p style="margin-top:0.5rem">© 2026 AI-Driven Cyber Threat Detection Project. All Rights Reserved. Built by <span>Team TriLogic</span></p>
 </footer>
+
+<script>
+  // Theme Toggle Logic
+  const themeToggle = document.getElementById('theme-toggle');
+  const html = document.documentElement;
+
+  // Check for saved theme
+  const savedTheme = localStorage.getItem('theme');
+  if (savedTheme) {
+    html.setAttribute('data-theme', savedTheme);
+    themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+  }
+
+  themeToggle.addEventListener('click', () => {
+    const currentTheme = html.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    
+    html.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+  });
+</script>
 
 </body>
 </html>
