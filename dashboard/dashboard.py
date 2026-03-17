@@ -1298,3 +1298,5 @@ st.markdown("<div style='margin-bottom:0.5rem'></div>", unsafe_allow_html=True)
 if auto_refresh:
     time.sleep(REFRESH_SECS)
     st.rerun()
+
+    
