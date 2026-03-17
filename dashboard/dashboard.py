@@ -222,9 +222,60 @@ section[data-testid="stSidebar"] * { color:#e2e8f0 !important; }
 section[data-testid="stSidebar"] hr { border-color:#1e293b !important; }
 .status-online  { color:#22c55e !important; font-weight:600; font-size:0.92rem; }
 .status-offline { color:#ef4444 !important; font-weight:600; font-size:0.92rem; }
+
+/* ── NAVBAR ── */
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1.5rem;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    margin-bottom: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+.nav-logo {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #1e293b;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.nav-logo span {
+    color: #6366f1;
+}
 </style>
 
 """, unsafe_allow_html=True)
+
+# ─── NAVBAR RENDERING ─────────────────────────────────────────────────────────
+nav_left, nav_right = st.columns([1, 1])
+with nav_left:
+    st.markdown("""
+        <div class="nav-logo">
+            🛡️ TriLogic <span>Intelligence</span>
+        </div>
+    """, unsafe_allow_html=True)
+
+with nav_right:
+    # Use a container to align button to the right
+    col_btn_pad, col_btn = st.columns([3, 1])
+    with col_btn:
+        if st.button("🔄 Reset Stats", use_container_width=True):
+            try:
+                requests.post(f"{API_URL}/reset", timeout=2)
+                st.toast("Stats reset successfully!", icon="✅")
+                time.sleep(1)
+                st.rerun()
+            except:
+                st.error("Failed to reset stats.")
 
 # ─── THREE.JS NETWORK — Run once per session ──────────────────────────────────
 if "splash_shown" not in st.session_state:
@@ -550,7 +601,7 @@ def fetch(endpoint, timeout=10):
 
 def post_api(endpoint, payload):
     try:
-        requests.post(f"{API_URL}/{endpoint}", json=payload, timeout=5)
+        requests.post(f"{API_URL}/{endpoint}", json=payload, timeout=2)
     except:
         pass
 
@@ -622,12 +673,7 @@ with col_time:
             <div style="font-size:1.05rem;font-weight:700;color:#334155;font-family:'JetBrains Mono',monospace">{datetime.now().strftime('%H:%M:%S')}</div>
             <div style="font-size:0.86rem;color:#94a3b8">{datetime.now().strftime('%d %b %Y')}</div>
         </div>""", unsafe_allow_html=True)
-if st.button("🔄 Reset Stats", use_container_width=True):
-    try:
-        requests.post("https://cyberthreat-api.onrender.com/reset", timeout=5)
-    except:
-        pass
-    st.rerun()
+
 st.markdown("<div style='margin-bottom:1.2rem'></div>", unsafe_allow_html=True)
 
 # ─── KPI CARDS ────────────────────────────────────────────────────────────────
