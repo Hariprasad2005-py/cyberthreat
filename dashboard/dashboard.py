@@ -462,7 +462,6 @@ with nav_placeholder:
             if st.button(toggle_label, key="dark_toggle", use_container_width=True):
                 st.session_state.dark_mode = not st.session_state.dark_mode
                 st.session_state.reset_status = None
-                time.sleep(1)
                 st.rerun()
         with btn_col2:
             if st.button("🔄 Reset", key="reset_btn", use_container_width=True):
@@ -474,7 +473,6 @@ with nav_placeholder:
                         st.session_state.reset_status = "fail"
                 except Exception:
                     st.session_state.reset_status = "fail"
-                time.sleep(1)
                 st.rerun()
 
 # ─── NOTIFICATION BANNER (mutually exclusive) ──────────────────────────────────
@@ -703,6 +701,7 @@ with st.sidebar:
         st.caption("No actions yet")
 
 # ─── API HELPERS ──────────────────────────────────────────────────────────────
+# ─── API HELPERS ──────────────────────────────────────────────────────────────
 def fetch(endpoint, timeout=2):
     try:
         r = requests.get(f"{API_URL}/{endpoint}", timeout=timeout)
@@ -712,12 +711,15 @@ def fetch(endpoint, timeout=2):
         pass
     return None
 
+@st.cache_data(ttl=5)
 def fetch_history():
     return fetch(f"history?limit={HISTORY_LIMIT}") or []
 
+@st.cache_data(ttl=5)
 def fetch_stats():
     return fetch("stats") or {}
 
+@st.cache_data(ttl=5)
 def fetch_model():
     return fetch("model_info") or {}
 
@@ -730,7 +732,6 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
     history = f1.result()
     stats   = f2.result()
     model   = f3.result()
-
 # ─── SOUND ALERT ──────────────────────────────────────────────────────────────
 if history and st.session_state.sound_enabled:
     new_high = [h for h in history[-5:]
