@@ -20,7 +20,7 @@ API_BASE      = "http://localhost:5000"
 REMOTE_API    = "https://cyberthreat-api.onrender.com"
 REFRESH_SECS  = 2
 HISTORY_LIMIT = 100
-
+@st.cache_data(ttl=30)
 def get_api_base():
     try:
         r = requests.get(f"{API_BASE}/health", timeout=1)
@@ -28,7 +28,7 @@ def get_api_base():
             return API_BASE
     except:
         pass
-    return REMOTE_API
+    return REMOTE_API   
 
 API_URL = get_api_base()
 
@@ -703,7 +703,7 @@ with st.sidebar:
         st.caption("No actions yet")
 
 # ─── API HELPERS ──────────────────────────────────────────────────────────────
-def fetch(endpoint, timeout=10):
+def fetch(endpoint, timeout=2):
     try:
         r = requests.get(f"{API_URL}/{endpoint}", timeout=timeout)
         if r.status_code == 200:
