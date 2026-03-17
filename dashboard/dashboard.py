@@ -18,7 +18,7 @@ from datetime import datetime
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
 API_BASE      = "http://localhost:5000"
 REMOTE_API    = "https://cyberthreat-api.onrender.com"
-REFRESH_SECS  = 10
+REFRESH_SECS  = 2
 HISTORY_LIMIT = 100
 
 def get_api_base():
@@ -587,7 +587,7 @@ var num = document.getElementById('countdown-num');
 setTimeout(function() {
     var splash = document.getElementById('splash');
     if (splash) splash.classList.add('hiding');
-}, 5800);
+}, 1800);
 (function() {
     var canvas = document.getElementById('c');
     var W = canvas.parentElement.offsetWidth || 800, H = 500;
@@ -662,7 +662,7 @@ setTimeout(function() {
 </body>
 </html>
         """, height=520, scrolling=False)
-    time.sleep(6)
+    time.sleep(2)
     _splash.empty()
     st.session_state.splash_shown = True
 
